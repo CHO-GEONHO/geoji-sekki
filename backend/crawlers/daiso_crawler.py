@@ -5,9 +5,12 @@
 AI: 가성비 점수 + 한줄 코멘트 배치 처리
 """
 
+from __future__ import annotations
+
 import logging
 import re
 from datetime import datetime, date
+from typing import Optional
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
@@ -40,7 +43,7 @@ CATEGORY_KEYWORDS = {
 }
 
 
-def _get_month_key(d: date | None = None) -> str:
+def _get_month_key(d: Optional[date] = None) -> str:
     d = d or date.today()
     return d.strftime("%Y-%m")
 
@@ -125,7 +128,7 @@ class DaisoCrawler(BaseCrawler):
 
     def _parse_single(
         self, card: BeautifulSoup, page_type: str, month_key: str, rank: int
-    ) -> dict | None:
+    ) -> Optional[dict]:
         # 상품명
         name_el = card.select_one("[class*='name'], [class*='title'], h3, h4, a")
         if not name_el:

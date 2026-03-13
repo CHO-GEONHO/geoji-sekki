@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 import json
 import logging
 import re
+from typing import Optional
 
 from openai import AsyncOpenAI
 
@@ -13,8 +16,8 @@ class LLMService:
     """DeepSeek (primary) + Gemini Flash (fallback) LLM 서비스."""
 
     def __init__(self):
-        self._deepseek: AsyncOpenAI | None = None
-        self._gemini: AsyncOpenAI | None = None
+        self._deepseek: Optional[AsyncOpenAI] = None
+        self._gemini: Optional[AsyncOpenAI] = None
 
     @property
     def deepseek(self) -> AsyncOpenAI:
@@ -26,7 +29,7 @@ class LLMService:
         return self._deepseek
 
     @property
-    def gemini(self) -> AsyncOpenAI | None:
+    def gemini(self) -> Optional[AsyncOpenAI]:
         if not settings.gemini_api_key:
             return None
         if self._gemini is None:

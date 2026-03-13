@@ -5,10 +5,13 @@ ppomppu.co.kr robots.txt 확인일: 2026-03-13
 요청 간 2~5초 랜덤 딜레이 적용
 """
 
+from __future__ import annotations
+
 import logging
 import random
 import re
 from datetime import datetime
+from typing import Optional
 from urllib.parse import urljoin
 
 import httpx
@@ -43,7 +46,7 @@ CATEGORY_KEYWORDS = {
 }
 
 
-def _classify_by_keyword(title: str) -> str | None:
+def _classify_by_keyword(title: str) -> Optional[str]:
     """키워드 매칭으로 카테고리 분류 (80% 커버)"""
     title_lower = title.lower()
     for category, keywords in CATEGORY_KEYWORDS.items():
@@ -53,7 +56,7 @@ def _classify_by_keyword(title: str) -> str | None:
     return None
 
 
-def _parse_price(text: str) -> int | None:
+def _parse_price(text: str) -> Optional[int]:
     """가격 텍스트에서 숫자 추출"""
     if not text:
         return None
@@ -123,7 +126,7 @@ class PpomppuCrawler(BaseCrawler):
 
         return items
 
-    def _parse_row(self, row: BeautifulSoup) -> dict | None:
+    def _parse_row(self, row: BeautifulSoup) -> Optional[dict]:
         """게시글 행 파싱"""
         # 제목 — 뽐뿌 실제 셀렉터 패턴 다양: a.list_subject_a, font.list_title a, etc.
         title_el = row.select_one(

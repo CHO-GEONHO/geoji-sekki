@@ -1,4 +1,8 @@
+from __future__ import annotations
+
 from datetime import datetime, date
+from typing import Optional
+
 from pydantic import BaseModel
 
 
@@ -9,11 +13,11 @@ class CvsProductOut(BaseModel):
     name: str
     price: int
     event_type: str
-    category: str | None = None
-    unit_price: int | None = None
-    image_url: str | None = None
-    start_date: date | None = None
-    end_date: date | None = None
+    category: Optional[str] = None
+    unit_price: Optional[int] = None
+    image_url: Optional[str] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
     week_key: str
 
     model_config = {"from_attributes": True}
@@ -23,7 +27,7 @@ class CvsCompareItem(BaseModel):
     store: str
     price: int
     event_type: str
-    unit_price: int | None = None
+    unit_price: Optional[int] = None
 
 
 class CvsCompareOut(BaseModel):
@@ -37,16 +41,16 @@ class HotdealOut(BaseModel):
     id: int
     source: str
     title: str
-    price: str | None = None
-    price_value: int | None = None
-    discount_rate: int | None = None
+    price: Optional[str] = None
+    price_value: Optional[int] = None
+    discount_rate: Optional[int] = None
     vote_count: int
     comment_count: int
     url: str
-    category: str | None = None
-    summary: str | None = None
-    image_url: str | None = None
-    posted_at: datetime | None = None
+    category: Optional[str] = None
+    summary: Optional[str] = None
+    image_url: Optional[str] = None
+    posted_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 
@@ -55,17 +59,17 @@ class HotdealOut(BaseModel):
 class OliveyoungDealOut(BaseModel):
     id: int
     name: str
-    brand: str | None = None
-    original_price: int | None = None
-    sale_price: int | None = None
-    discount_rate: int | None = None
-    event_type: str | None = None
-    category: str | None = None
-    url: str | None = None
-    image_url: str | None = None
+    brand: Optional[str] = None
+    original_price: Optional[int] = None
+    sale_price: Optional[int] = None
+    discount_rate: Optional[int] = None
+    event_type: Optional[str] = None
+    category: Optional[str] = None
+    url: Optional[str] = None
+    image_url: Optional[str] = None
     is_oliveyoung_pick: bool
-    start_date: date | None = None
-    end_date: date | None = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
 
     model_config = {"from_attributes": True}
 
@@ -82,13 +86,13 @@ class DaisoProductOut(BaseModel):
     id: int
     name: str
     price: int
-    category: str | None = None
+    category: Optional[str] = None
     is_new: bool
-    ranking: int | None = None
-    url: str | None = None
-    image_url: str | None = None
-    ai_score: float | None = None
-    ai_comment: str | None = None
+    ranking: Optional[int] = None
+    url: Optional[str] = None
+    image_url: Optional[str] = None
+    ai_score: Optional[float] = None
+    ai_comment: Optional[str] = None
     month_key: str
 
     model_config = {"from_attributes": True}
@@ -99,21 +103,21 @@ class FeedItem(BaseModel):
     title: str
     body: str
     source: str           # cvs, hotdeal, oliveyoung, daiso
-    store: str | None = None
-    category: str | None = None
+    store: Optional[str] = None
+    category: Optional[str] = None
     priority: int = 0
-    url: str | None = None
+    url: Optional[str] = None
 
 
 class FeedOut(BaseModel):
     date: str
     items: list[FeedItem]
-    created_at: datetime | None = None
+    created_at: Optional[datetime] = None
 
 
 # ── 헬스 체크 ──
 class CrawlerHealth(BaseModel):
-    last_success: datetime | None = None
+    last_success: Optional[datetime] = None
     items: int = 0
     status: str = "unknown"
 

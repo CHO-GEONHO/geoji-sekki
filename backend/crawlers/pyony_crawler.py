@@ -5,9 +5,12 @@ pyony.com robots.txt 확인일: 2026-03-13 — 크롤링 제한 없음.
 대안 소스: martmonster.com (사전 조사 완료, 구조 유사)
 """
 
+from __future__ import annotations
+
 import logging
 import re
 from datetime import datetime, date
+from typing import Optional
 
 from bs4 import BeautifulSoup
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -51,7 +54,7 @@ CATEGORY_KEYWORDS = {
 }
 
 
-def _get_week_key(d: date | None = None) -> str:
+def _get_week_key(d: Optional[date] = None) -> str:
     """ISO 주차 키 생성 (e.g. '2026-W11')"""
     d = d or date.today()
     iso = d.isocalendar()
@@ -150,7 +153,7 @@ class PyonyCrawler(BaseCrawler):
 
     def _parse_single_product(
         self, card: BeautifulSoup, store: str, week_key: str
-    ) -> dict | None:
+    ) -> Optional[dict]:
         """단일 상품 카드 파싱"""
         # 상품명 — <strong> 태그
         name_el = card.select_one("strong")

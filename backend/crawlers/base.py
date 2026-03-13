@@ -1,9 +1,12 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import random
 import time
 from abc import ABC, abstractmethod
 from datetime import datetime
+from typing import Optional
 
 import httpx
 
@@ -37,7 +40,7 @@ class BaseCrawler(ABC):
     max_delay: float = 5.0
 
     def __init__(self):
-        self._client: httpx.AsyncClient | None = None
+        self._client: Optional[httpx.AsyncClient] = None
 
     async def get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
@@ -52,7 +55,7 @@ class BaseCrawler(ABC):
         if self._client and not self._client.is_closed:
             await self._client.aclose()
 
-    async def fetch(self, url: str, retries: int | None = None) -> str:
+    async def fetch(self, url: str, retries: Optional[int] = None) -> str:
         """URL 요청 + 재시도 (exponential backoff)"""
         retries = retries or self.max_retries
         client = await self.get_client()
@@ -138,7 +141,7 @@ class BaseCrawler(ABC):
         items_count: int,
         duration: float,
         started_at: datetime,
-        error: str | None = None,
+        error: Optional[str] = None,
     ):
         """크롤링 결과를 crawl_logs에 기록"""
         async with async_session() as session:

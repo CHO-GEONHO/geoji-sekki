@@ -8,10 +8,13 @@
 5. 실패 시 전날 피드 재사용
 """
 
+from __future__ import annotations
+
 import json
 import logging
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from typing import Optional
 
 from sqlalchemy import select, desc, func
 
@@ -26,7 +29,7 @@ logger = logging.getLogger("geojisekki.feed")
 PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "daily_feed.txt"
 
 
-async def generate_daily_feed(target_date: date | None = None) -> dict:
+async def generate_daily_feed(target_date: Optional[date] = None) -> dict:
     """데일리 피드 생성.
 
     반환: {"date": "2026-03-13", "items": [...], "model": "deepseek-chat"}

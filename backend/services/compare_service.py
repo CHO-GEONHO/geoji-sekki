@@ -1,4 +1,7 @@
 """편의점 간 가격 비교 서비스."""
+from __future__ import annotations
+
+from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -10,8 +13,8 @@ from backend.crawlers.pyony_crawler import _get_week_key
 async def compare_product(
     session: AsyncSession,
     product_name: str,
-    week_key: str | None = None,
-) -> dict | None:
+    week_key: Optional[str] = None,
+) -> Optional[dict]:
     """같은 상품명이 여러 편의점에서 행사 중일 때 비교.
 
     반환:

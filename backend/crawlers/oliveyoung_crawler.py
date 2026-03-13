@@ -8,9 +8,12 @@ API 없으면 Playwright headless로 fallback.
 올영세일(3/6/9/12월), 올영데이(매월 25~27일) → 매일로 증가
 """
 
+from __future__ import annotations
+
 import logging
 import re
 from datetime import datetime, date
+from typing import Optional
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
@@ -140,7 +143,7 @@ class OliveyoungCrawler(BaseCrawler):
 
         return products
 
-    def _parse_single(self, card: BeautifulSoup, sale_type: str) -> dict | None:
+    def _parse_single(self, card: BeautifulSoup, sale_type: str) -> Optional[dict]:
         """단일 상품 파싱"""
         # 상품명
         name_el = card.select_one(".prd_name, .product-name, a[class*='name']")
