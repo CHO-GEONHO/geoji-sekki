@@ -74,7 +74,7 @@ async def get_cvs_products(
     }
 
 
-@router.get("/cvs/compare", response_model=CvsCompareOut | dict)
+@router.get("/cvs/compare")
 @limiter.limit("60/minute")
 async def compare_cvs_product(
     request: Request,

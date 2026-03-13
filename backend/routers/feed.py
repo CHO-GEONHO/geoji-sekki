@@ -16,7 +16,7 @@ from backend.schemas import FeedOut, FeedItem
 router = APIRouter(tags=["피드"])
 
 
-@router.get("/feed", response_model=FeedOut | dict)
+@router.get("/feed")
 @limiter.limit("60/minute")
 async def get_daily_feed(
     request: Request,
