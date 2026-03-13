@@ -22,14 +22,11 @@ from backend.models import OliveyoungDeal
 
 logger = logging.getLogger("geojisekki.crawler.oliveyoung")
 
-# 올리브영 세일 페이지 URL (모바일 웹)
+# 올리브영 세일 페이지 URL
 SALE_URLS = {
-    "sale": "https://www.oliveyoung.co.kr/store/main/getSaleList.do",
-    "best": "https://www.oliveyoung.co.kr/store/main/getBestList.do",
+    "sale": "https://www.oliveyoung.co.kr/store/display/getMCategoryList.do?dispCatNo=100000100100001",
+    "best": "https://www.oliveyoung.co.kr/store/main/getBestList.do?dispCatNo=900000100100001&fltDispCatNo=&prdSort=01",
 }
-
-# 올리브영 API (내부 XHR) — 실제 배포 시 네트워크 탭에서 확인 후 업데이트
-OY_API_BASE = "https://www.oliveyoung.co.kr/store/api"
 
 CATEGORY_MAP = {
     "스킨케어": ["스킨", "토너", "에센스", "세럼", "크림", "로션", "앰플", "마스크팩"],
@@ -57,22 +54,24 @@ class OliveyoungCrawler(BaseCrawler):
     _use_playwright = False
 
     async def crawl(self) -> list[dict]:
-        """세일 상품 크롤링. httpx 우선, 실패 시 Playwright 전환."""
+        """세일 상품 크롤링. Playwright 우선 (올리브영은 httpx에 403 반환)."""
         items = []
 
-        # 1차: httpx로 시도 (SSR 페이지 또는 API)
-        try:
-            items = await self._crawl_httpx()
-            if items:
-                return items
-        except Exception as e:
-            logger.warning("[oliveyoung] httpx 크롤링 실패: %s — Playwright 전환", e)
-
-        # 2차: Playwright headless
+        # 1차: Playwright headless (올리브영은 JS 렌더링 + 봇 차단)
         try:
             items = await self._crawl_playwright()
+            if items:
+                return items
+        except ImportError:
+            logger.warning("[oliveyoung] Playwright 미설치 — httpx fallback")
         except Exception as e:
-            logger.error("[oliveyoung] Playwright 크롤링도 실패: %s", e)
+            logger.warning("[oliveyoung] Playwright 실패: %s — httpx fallback", e)
+
+        # 2차: httpx (SSR 페이지)
+        try:
+            items = await self._crawl_httpx()
+        except Exception as e:
+            logger.error("[oliveyoung] httpx도 실패: %s", e)
             raise
 
         return items
@@ -125,9 +124,10 @@ class OliveyoungCrawler(BaseCrawler):
         """올리브영 상품 목록 파싱"""
         products = []
 
-        # 올리브영 상품 카드 셀렉터
+        # 올리브영 상품 카드 셀렉터 — li.prd_info 또는 li 안에 상품 구조
         cards = soup.select(
-            ".prd_info, .product-item, [class*='product'], [class*='prd']"
+            "li.prd_info, ul.prd_list li, .prd-list li, "
+            "[class*='prd_info'], [class*='product-item']"
         )
 
         for card in cards:

@@ -112,8 +112,8 @@ class PyonyCrawler(BaseCrawler):
             items.extend(products)
             page += 1
 
-            # 다음 페이지 존재 확인
-            next_link = soup.select_one("a.next, .pagination a[rel='next']")
+            # 다음 페이지 존재 확인: [>>] 또는 ?page=N+1 링크
+            next_link = soup.select_one(f"a[href*='page={page + 1}']")
             if not next_link:
                 break
 
@@ -122,12 +122,21 @@ class PyonyCrawler(BaseCrawler):
         return items
 
     def _parse_products(self, soup: BeautifulSoup, store: str) -> list[dict]:
-        """HTML에서 상품 목록 파싱"""
+        """HTML에서 상품 목록 파싱
+
+        pyony.com 실제 HTML 구조:
+          <a href="/brands/cu/products/54010/">
+            <img src="//tqklhszfkvzk6518638.edge.naverncp.com/product/xxx.jpg">
+            <strong>상품명</strong>
+            <span>1,800 원 (900원)</span>
+            <span>1+1 개꿀 댓글(0)</span>
+          </a>
+        """
         products = []
         week_key = _get_week_key()
 
-        # pyony.com 상품 카드 셀렉터
-        cards = soup.select(".product-list .product-item, .card-list .card")
+        # 상품 링크: /brands/{store}/products/{id}/ 패턴의 <a> 태그
+        cards = soup.select(f"a[href*='/brands/'][href*='/products/']")
 
         for card in cards:
             try:
@@ -143,34 +152,40 @@ class PyonyCrawler(BaseCrawler):
         self, card: BeautifulSoup, store: str, week_key: str
     ) -> dict | None:
         """단일 상품 카드 파싱"""
-        # 상품명
-        name_el = card.select_one(".product-name, .card-title, h3, h4")
+        # 상품명 — <strong> 태그
+        name_el = card.select_one("strong")
         if not name_el:
             return None
         name = name_el.get_text(strip=True)
         if not name:
             return None
 
-        # 가격
-        price_el = card.select_one(".product-price, .price, .card-price")
-        price_text = price_el.get_text(strip=True) if price_el else "0"
-        price = int(re.sub(r"[^\d]", "", price_text) or "0")
+        # <span> 태그들에서 가격과 행사타입 추출
+        spans = card.select("span")
+        price = 0
+        event_type = "discount"
+
+        for span in spans:
+            text = span.get_text(strip=True)
+            # 가격 패턴: "1,800 원 (900원)" 또는 "1,800원"
+            price_match = re.search(r"([\d,]+)\s*원", text)
+            if price_match and price == 0:
+                price = int(price_match.group(1).replace(",", ""))
+            # 행사 타입 패턴: "1+1 개꿀" "2+1 개이득"
+            for key, val in EVENT_TYPE_MAP.items():
+                if key in text:
+                    event_type = val
+                    break
+
         if price <= 0 or price > 1_000_000:
             return None
-
-        # 행사 타입
-        event_el = card.select_one(".badge, .event-type, .tag, .label")
-        event_text = event_el.get_text(strip=True) if event_el else ""
-        event_type = "discount"
-        for key, val in EVENT_TYPE_MAP.items():
-            if key in event_text:
-                event_type = val
-                break
 
         # 이미지
         img_el = card.select_one("img")
         image_url = img_el.get("src", "") if img_el else ""
-        if image_url and not image_url.startswith("http"):
+        if image_url and image_url.startswith("//"):
+            image_url = f"https:{image_url}"
+        elif image_url and not image_url.startswith("http"):
             image_url = f"https://pyony.com{image_url}"
 
         # 카테고리 분류

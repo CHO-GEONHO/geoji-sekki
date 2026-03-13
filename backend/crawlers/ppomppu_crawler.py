@@ -6,14 +6,16 @@ ppomppu.co.kr robots.txt 확인일: 2026-03-13
 """
 
 import logging
+import random
 import re
 from datetime import datetime
 from urllib.parse import urljoin
 
+import httpx
 from bs4 import BeautifulSoup
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
-from backend.crawlers.base import BaseCrawler
+from backend.crawlers.base import BaseCrawler, USER_AGENTS
 from backend.database import async_session
 from backend.models import Hotdeal
 from backend.services.llm_service import llm_service
@@ -70,6 +72,21 @@ class PpomppuCrawler(BaseCrawler):
     min_expected_items = 5
     max_pages = 2  # 1~2페이지만
 
+    async def get_client(self) -> httpx.AsyncClient:
+        """뽐뿌 전용 클라이언트 — Referer/Accept 헤더 추가로 403 방지"""
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(
+                headers={
+                    "User-Agent": random.choice(USER_AGENTS),
+                    "Referer": "https://www.ppomppu.co.kr/",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                    "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+                },
+                timeout=30.0,
+                follow_redirects=True,
+            )
+        return self._client
+
     async def crawl(self) -> list[dict]:
         items = []
         for page in range(1, self.max_pages + 1):
@@ -93,8 +110,8 @@ class PpomppuCrawler(BaseCrawler):
         soup = BeautifulSoup(html, "lxml")
         items = []
 
-        # 뽐뿌 게시판 행 셀렉터
-        rows = soup.select("tr.common-list0, tr.common-list1, tr[class*='list']")
+        # 뽐뿌 게시판 행 셀렉터 (실제: tr.list0, tr.list1)
+        rows = soup.select("tr.list0, tr.list1, tr.common-list0, tr.common-list1")
 
         for row in rows:
             try:
@@ -108,8 +125,11 @@ class PpomppuCrawler(BaseCrawler):
 
     def _parse_row(self, row: BeautifulSoup) -> dict | None:
         """게시글 행 파싱"""
-        # 제목
-        title_el = row.select_one("a.title, td.title a, a.baseList-title")
+        # 제목 — 뽐뿌 실제 셀렉터 패턴 다양: a.list_subject_a, font.list_title a, etc.
+        title_el = row.select_one(
+            "a.list_subject_a, font.list_title a, td.list_title a, "
+            "a[href*='view.php'], a.title, td.title a"
+        )
         if not title_el:
             return None
         title = title_el.get_text(strip=True)
@@ -118,31 +138,37 @@ class PpomppuCrawler(BaseCrawler):
 
         # URL
         href = title_el.get("href", "")
-        url = urljoin(BASE_URL, href) if href else ""
-        if not url:
+        url = urljoin(BASE_URL + "/zboard/", href) if href else ""
+        if not url or "view.php" not in url:
             return None
 
         # 추천수
-        vote_el = row.select_one(".vote, .baseList-rec, td.recommend .symph_count")
+        vote_el = row.select_one(
+            "td.list_vote, .symph_count, td:nth-child(5), .vote"
+        )
         vote_text = vote_el.get_text(strip=True) if vote_el else "0"
         vote_count = int(re.sub(r"[^\d\-]", "", vote_text) or "0")
 
-        # 댓글수
-        comment_el = row.select_one(".comment_count, .baseList-comment")
-        comment_text = comment_el.get_text(strip=True) if comment_el else "0"
-        comment_count = int(re.sub(r"[^\d]", "", comment_text) or "0")
+        # 댓글수 — 제목 옆 [N] 패턴에서 추출
+        comment_count = 0
+        comment_el = row.select_one(".list_comment2, .comment_count, .baseList-comment")
+        if comment_el:
+            comment_text = comment_el.get_text(strip=True)
+            comment_count = int(re.sub(r"[^\d]", "", comment_text) or "0")
 
         # 가격 (제목에서 추출 시도)
         price_value = _parse_price(title)
 
         # 이미지
-        img_el = row.select_one("img.thumb, img")
-        image_url = img_el.get("src", "") if img_el else ""
+        img_el = row.select_one("img[src*='thumb'], img.list_img, img")
+        image_url = ""
+        if img_el:
+            image_url = img_el.get("src", "") or img_el.get("data-src", "")
         if image_url and not image_url.startswith("http"):
             image_url = urljoin(BASE_URL, image_url)
 
         # 작성 시간
-        date_el = row.select_one(".date, .baseList-date, td.time")
+        date_el = row.select_one("td.list_date, .date, td.time, nobr")
         posted_at = None
         if date_el:
             date_text = date_el.get_text(strip=True)
@@ -152,6 +178,10 @@ class PpomppuCrawler(BaseCrawler):
                         hour=int(date_text.split(":")[0]),
                         minute=int(date_text.split(":")[1]),
                         second=0, microsecond=0,
+                    )
+                elif "/" in date_text:
+                    posted_at = datetime.strptime(date_text[:5], "%m/%d").replace(
+                        year=datetime.now().year
                     )
                 else:
                     posted_at = datetime.strptime(date_text[:10], "%Y-%m-%d")

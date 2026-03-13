@@ -72,12 +72,13 @@ app.add_middleware(
 )
 
 # ── Routers ──
-from backend.routers import feed, cvs, oliveyoung, daiso, hotdeals
+from backend.routers import feed, cvs, oliveyoung, daiso, hotdeals, admin
 app.include_router(feed.router, prefix="/api")
 app.include_router(cvs.router, prefix="/api")
 app.include_router(oliveyoung.router, prefix="/api")
 app.include_router(daiso.router, prefix="/api")
 app.include_router(hotdeals.router, prefix="/api")
+app.include_router(admin.router, prefix="/api")
 
 # ── Static Files (Frontend build) ──
 frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"

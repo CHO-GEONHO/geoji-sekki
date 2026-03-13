@@ -20,12 +20,12 @@ from backend.services.llm_service import llm_service
 
 logger = logging.getLogger("geojisekki.crawler.daiso")
 
-BASE_URL = "https://www.daisomall.co.kr"
+BASE_URL = "https://www.daiso.co.kr"
 
-# 다이소몰 페이지 URL
+# 다이소 페이지 URL — JS 렌더링 필요 (Swiper 기반)
 DAISO_URLS = {
-    "new": f"{BASE_URL}/category/new",
-    "best": f"{BASE_URL}/category/best",
+    "new": f"{BASE_URL}/goods/new_arrival.do",
+    "best": f"{BASE_URL}/goods/best_seller.do",
 }
 
 CATEGORY_KEYWORDS = {
@@ -62,18 +62,21 @@ class DaisoCrawler(BaseCrawler):
         items = []
 
         for page_type, url in DAISO_URLS.items():
+            # 다이소는 JS 렌더링 필수 → Playwright 우선
             try:
-                page_items = await self._crawl_page(url, page_type)
+                page_items = await self._crawl_playwright(url, page_type)
                 items.extend(page_items)
-                logger.info("[daiso] %s: %d개 수집", page_type, len(page_items))
+                logger.info("[daiso] %s: %d개 수집 (playwright)", page_type, len(page_items))
                 await self.delay()
-            except Exception as e:
-                logger.error("[daiso] %s 크롤링 실패: %s — Playwright 시도", page_type, e)
+            except ImportError:
+                logger.warning("[daiso] Playwright 미설치 — httpx fallback")
                 try:
-                    page_items = await self._crawl_playwright(url, page_type)
+                    page_items = await self._crawl_page(url, page_type)
                     items.extend(page_items)
                 except Exception as e2:
-                    logger.error("[daiso] %s Playwright도 실패: %s", page_type, e2)
+                    logger.error("[daiso] %s httpx도 실패: %s", page_type, e2)
+            except Exception as e:
+                logger.error("[daiso] %s Playwright 실패: %s", page_type, e)
 
         # AI 가성비 점수 (배치)
         items = await self._score_items(items)
