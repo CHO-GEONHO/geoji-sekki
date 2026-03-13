@@ -1,0 +1,186 @@
+import json
+import logging
+import re
+
+from openai import AsyncOpenAI
+
+from backend.config import settings
+
+logger = logging.getLogger("geojisekki.llm")
+
+
+class LLMService:
+    """DeepSeek (primary) + Gemini Flash (fallback) LLM 서비스."""
+
+    def __init__(self):
+        self._deepseek: AsyncOpenAI | None = None
+        self._gemini: AsyncOpenAI | None = None
+
+    @property
+    def deepseek(self) -> AsyncOpenAI:
+        if self._deepseek is None:
+            self._deepseek = AsyncOpenAI(
+                api_key=settings.deepseek_api_key,
+                base_url=settings.deepseek_base_url,
+            )
+        return self._deepseek
+
+    @property
+    def gemini(self) -> AsyncOpenAI | None:
+        if not settings.gemini_api_key:
+            return None
+        if self._gemini is None:
+            self._gemini = AsyncOpenAI(
+                api_key=settings.gemini_api_key,
+                base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+            )
+        return self._gemini
+
+    async def chat(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        json_mode: bool = False,
+        max_tokens: int = 2000,
+    ) -> dict:
+        """LLM 호출 → {"content": str, "model": str, "tokens": {...}} 반환.
+
+        DeepSeek 실패 시 Gemini Flash로 자동 fallback.
+        """
+        providers = [
+            ("deepseek", self.deepseek, settings.deepseek_model),
+        ]
+        if self.gemini:
+            providers.append(("gemini", self.gemini, "gemini-2.0-flash"))
+
+        last_error = None
+        for provider_name, client, model in providers:
+            try:
+                return await self._call(
+                    client, model, system_prompt, user_prompt,
+                    json_mode=json_mode, max_tokens=max_tokens,
+                    provider_name=provider_name,
+                )
+            except Exception as e:
+                logger.warning("[%s] LLM 호출 실패: %s", provider_name, e)
+                last_error = e
+
+        raise RuntimeError(f"모든 LLM provider 실패. 마지막 에러: {last_error}")
+
+    async def _call(
+        self,
+        client: AsyncOpenAI,
+        model: str,
+        system_prompt: str,
+        user_prompt: str,
+        json_mode: bool,
+        max_tokens: int,
+        provider_name: str,
+    ) -> dict:
+        kwargs = {}
+        if json_mode:
+            kwargs["response_format"] = {"type": "json_object"}
+
+        response = await client.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            max_tokens=max_tokens,
+            temperature=0.7,
+            **kwargs,
+        )
+
+        content = response.choices[0].message.content
+        usage = response.usage
+
+        logger.info(
+            "[%s] model=%s, prompt_tokens=%d, completion_tokens=%d",
+            provider_name, model,
+            usage.prompt_tokens if usage else 0,
+            usage.completion_tokens if usage else 0,
+        )
+
+        return {
+            "content": content,
+            "model": model,
+            "tokens": {
+                "prompt": usage.prompt_tokens if usage else 0,
+                "completion": usage.completion_tokens if usage else 0,
+            },
+        }
+
+    async def chat_json(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        max_tokens: int = 2000,
+    ) -> dict:
+        """LLM 호출 후 JSON 파싱까지 수행.
+
+        반환: {"data": parsed_json, "model": str, "tokens": {...}}
+        """
+        result = await self.chat(
+            system_prompt, user_prompt,
+            json_mode=True, max_tokens=max_tokens,
+        )
+        parsed = self._parse_json(result["content"])
+        return {
+            "data": parsed,
+            "model": result["model"],
+            "tokens": result["tokens"],
+        }
+
+    @staticmethod
+    def _parse_json(text: str):
+        """JSON 파싱 + 마크다운 코드블럭 제거 fallback."""
+        text = text.strip()
+
+        # 1차: 직접 파싱
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            pass
+
+        # 2차: 마크다운 코드블럭 제거 후 파싱
+        match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
+        if match:
+            try:
+                return json.loads(match.group(1))
+            except json.JSONDecodeError:
+                pass
+
+        # 3차: 첫 번째 [ 또는 { 부터 마지막 ] 또는 } 까지 추출
+        match = re.search(r"[\[{][\s\S]*[\]}]", text)
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except json.JSONDecodeError:
+                pass
+
+        raise ValueError(f"JSON 파싱 실패: {text[:200]}")
+
+    async def batch_classify(
+        self,
+        items: list[dict],
+        system_prompt: str,
+        max_tokens: int = 3000,
+    ) -> list[dict]:
+        """여러 아이템을 한 번에 분류/요약 (배치 처리).
+
+        items: [{"id": ..., "title": ...}, ...]
+        반환: [{"id": ..., "category": ..., "summary": ...}, ...]
+        """
+        user_prompt = (
+            "아래 아이템들의 카테고리를 분류하고 한줄 요약을 작성해줘.\n"
+            "JSON 배열로만 응답해. 각 아이템에 id, category, summary 포함.\n\n"
+            + json.dumps(items, ensure_ascii=False)
+        )
+        result = await self.chat_json(system_prompt, user_prompt, max_tokens=max_tokens)
+        data = result["data"]
+        return data if isinstance(data, list) else data.get("items", [])
+
+
+# 싱글톤
+llm_service = LLMService()

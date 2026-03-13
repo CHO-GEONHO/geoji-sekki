@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Pretendard Variable', Pretendard, -apple-system, system-ui, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-gray-50 text-gray-900;
+    overscroll-behavior-y: contain;
+  }
+}
+
+@layer components {
+  .tab-active {
+    @apply text-geoji-600 font-semibold;
+  }
+
+  .card {
+    @apply bg-white rounded-2xl shadow-sm border border-gray-100 p-4;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-1plus1 {
+    @apply bg-red-100 text-red-700;
+  }
+
+  .badge-2plus1 {
+    @apply bg-orange-100 text-orange-700;
+  }
+
+  .badge-discount {
+    @apply bg-geoji-100 text-geoji-700;
+  }
+
+  .badge-store {
+    @apply bg-gray-100 text-gray-600;
+  }
+
+  .filter-chip {
+    @apply px-3 py-1.5 rounded-full text-sm border transition-colors;
+  }
+
+  .filter-chip-active {
+    @apply bg-geoji-500 text-white border-geoji-500;
+  }
+
+  .filter-chip-inactive {
+    @apply bg-white text-gray-600 border-gray-200 hover:border-geoji-300;
+  }
+
+  .skeleton {
+    @apply animate-pulse bg-gray-200 rounded;
+  }
+}
+
+/* Safe area (iOS notch/home bar) */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
