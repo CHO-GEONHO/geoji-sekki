@@ -80,12 +80,6 @@ app.include_router(daiso.router, prefix="/api")
 app.include_router(hotdeals.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 
-# ── Static Files (Frontend build) ──
-frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
-if frontend_dist.exists():
-    app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="static")
-
-
 # ── Health Check ──
 @app.get("/api/health")
 @limiter.limit("30/minute")
@@ -127,3 +121,9 @@ async def health_check(request: Request):
         },
         "db_size_mb": db_size_mb,
     }
+
+
+# ── Static Files (Frontend build) — 반드시 마지막에 mount ──
+frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
+if frontend_dist.exists():
+    app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="static")
