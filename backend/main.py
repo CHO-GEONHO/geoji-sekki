@@ -131,7 +131,15 @@ if frontend_dist.exists():
     async def spa_fallback(full_path: str):
         static_file = frontend_dist / full_path
         if static_file.exists() and static_file.is_file():
-            return FileResponse(str(static_file))
-        return FileResponse(str(frontend_dist / "index.html"))
+            # hashed assets (JS/CSS) → 장기 캐시, index.html → no-cache
+            if full_path.startswith("assets/"):
+                headers = {"Cache-Control": "public, max-age=31536000, immutable"}
+            else:
+                headers = {"Cache-Control": "no-cache, no-store, must-revalidate"}
+            return FileResponse(str(static_file), headers=headers)
+        return FileResponse(
+            str(frontend_dist / "index.html"),
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+        )
 
     app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="static")
