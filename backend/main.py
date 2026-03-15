@@ -126,10 +126,12 @@ async def health_check(request: Request):
 # ── Static Files (Frontend build) — 반드시 마지막에 mount ──
 frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
 if frontend_dist.exists():
-    # SPA fallback: /api 이외의 모든 경로는 index.html 반환
+    # SPA fallback: 파일이 존재하면 파일 반환, 없으면 index.html (React Router 지원)
     @app.get("/{full_path:path}")
     async def spa_fallback(full_path: str):
-        index = frontend_dist / "index.html"
-        return FileResponse(str(index))
+        static_file = frontend_dist / full_path
+        if static_file.exists() and static_file.is_file():
+            return FileResponse(str(static_file))
+        return FileResponse(str(frontend_dist / "index.html"))
 
-    app.mount("/assets", StaticFiles(directory=str(frontend_dist / "assets")), name="assets")
+    app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="static")
