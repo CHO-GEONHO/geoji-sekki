@@ -1,25 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-
-const PHRASES = [
-  '월급은 스쳐가고 할인은 남는다',
-  '오늘도 지갑은 다이어트 중',
-  '싸게 사야 오래 산다',
-  '거지도 안목은 있다',
-  '통장 잔고가 날 성장시킨다',
-  '아끼면 거지, 잘 아끼면 현자',
-  '할인 앞에선 누구나 평등하다',
-  '오늘 득템, 내일 풍요',
-  '사지 않으면 100% 할인, 잘 사면 200% 만족',
-  '지갑이 얇을수록 눈이 높아진다',
-]
-
-function getDailyPhrase() {
-  // KST 기준 날짜 (UTC+9)
-  const now = new Date()
-  const kstDate = new Date(now.getTime() + 9 * 60 * 60 * 1000)
-  const dayOfYear = Math.floor(kstDate.getTime() / (1000 * 60 * 60 * 24))
-  return PHRASES[dayOfYear % PHRASES.length]
-}
+import { getDailyPhrase, getMsUntilKstMidnight } from '../utils/phrases'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useFeed } from '../hooks/useApi'
 import FeedCard from '../components/FeedCard'
@@ -50,18 +30,13 @@ function formatDate(dateStr) {
 
 export default function TodayFeed() {
   const [dayOffset, setDayOffset] = useState(0)
-  const [phrase, setPhrase] = useState(getDailyPhrase)
+  const [phrase, setPhrase] = useState(() => getDailyPhrase(0))
   const dateStr = useMemo(() => getDateStr(dayOffset), [dayOffset])
   const { data, isLoading, error } = useFeed(dateStr)
 
   // KST 자정에 캐치프레이즈 갱신
   useEffect(() => {
-    const now = new Date()
-    const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000)
-    const msUntilMidnight =
-      (24 * 60 * 60 * 1000) -
-      ((kstNow.getUTCHours() * 60 + kstNow.getUTCMinutes()) * 60 + kstNow.getUTCSeconds()) * 1000
-    const timer = setTimeout(() => setPhrase(getDailyPhrase()), msUntilMidnight)
+    const timer = setTimeout(() => setPhrase(getDailyPhrase(0)), getMsUntilKstMidnight())
     return () => clearTimeout(timer)
   }, [phrase])
 

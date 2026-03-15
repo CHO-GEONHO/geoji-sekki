@@ -1,7 +1,8 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useState, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import TabBar from './components/TabBar'
 import LoadingSpinner from './components/LoadingSpinner'
+import { getDailyPhrase, getMsUntilKstMidnight } from './utils/phrases'
 
 const TodayFeed = lazy(() => import('./pages/TodayFeed'))
 const CvsPage = lazy(() => import('./pages/CvsPage'))
@@ -10,6 +11,13 @@ const DaisoPage = lazy(() => import('./pages/DaisoPage'))
 const HotdealsPage = lazy(() => import('./pages/HotdealsPage'))
 
 export default function App() {
+  const [headerPhrase, setHeaderPhrase] = useState(() => getDailyPhrase(1))
+
+  useEffect(() => {
+    const timer = setTimeout(() => setHeaderPhrase(getDailyPhrase(1)), getMsUntilKstMidnight())
+    return () => clearTimeout(timer)
+  }, [headerPhrase])
+
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       {/* Header */}
@@ -22,7 +30,7 @@ export default function App() {
           />
           <div className="min-w-0">
             <h1 className="text-[17px] font-black text-gray-900 leading-none tracking-tight">거지세끼</h1>
-            <p className="text-[11px] text-gray-400 font-medium mt-0.5 truncate">월급은 스쳐가고 할인은 남는다</p>
+            <p className="text-[11px] text-gray-400 font-medium mt-0.5 truncate">{headerPhrase}</p>
           </div>
         </div>
       </header>
