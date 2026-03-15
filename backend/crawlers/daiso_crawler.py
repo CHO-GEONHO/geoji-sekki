@@ -152,9 +152,9 @@ class DaisoCrawler(BaseCrawler):
                         full_url = urljoin(BASE_URL, href)
                         urls.append((sid, full_url))
 
-            # 최신 3개만 크롤링
+            # 최신 6개 크롤링
             urls.sort(reverse=True)
-            return [u for _, u in urls[:3]]
+            return [u for _, u in urls[:6]]
         except Exception as e:
             logger.error("[daiso] 메인 페이지 파싱 실패: %s", e)
             return []

@@ -90,21 +90,37 @@ class OliveyoungCrawler(BaseCrawler):
         return items
 
     async def _crawl_curl_cffi(self) -> list[dict]:
-        """curl_cffi (Chrome TLS 핑거프린트 모방) 크롤링."""
+        """curl_cffi (Chrome TLS 핑거프린트 모방) 크롤링 — 최대 3페이지."""
         from curl_cffi import requests as cf_requests
 
-        response = cf_requests.get(
-            BEST_URL,
-            impersonate="chrome131",
-            headers={"Accept-Language": "ko-KR,ko;q=0.9"},
-            timeout=30,
-        )
-        response.raise_for_status()
+        all_products: list[dict] = []
+        seen_names: set[str] = set()
 
-        soup = BeautifulSoup(response.text, "lxml")
-        products = self._parse_products(soup)
-        logger.info("[oliveyoung] curl_cffi 수집: %d개", len(products))
-        return products
+        for page_idx in range(1, 4):  # 1, 2, 3페이지 = 최대 300개
+            url = f"{BEST_URL}&pageIdx={page_idx}"
+            response = cf_requests.get(
+                url,
+                impersonate="chrome120",
+                headers={"Accept-Language": "ko-KR,ko;q=0.9"},
+                timeout=30,
+            )
+            response.raise_for_status()
+
+            soup = BeautifulSoup(response.text, "lxml")
+            page_products = self._parse_products(soup)
+            if not page_products:
+                break
+
+            for p in page_products:
+                if p["name"] not in seen_names:
+                    seen_names.add(p["name"])
+                    all_products.append(p)
+
+            logger.info("[oliveyoung] page%d: %d개 수집", page_idx, len(page_products))
+            await self.delay()
+
+        logger.info("[oliveyoung] 전체 수집: %d개", len(all_products))
+        return all_products
 
     async def _crawl_playwright(self) -> list[dict]:
         """Playwright headless fallback (stealth 설정 적용)."""

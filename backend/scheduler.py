@@ -108,18 +108,18 @@ def start_scheduler():
         replace_existing=True,
     )
 
-    # 올영: 주 2회 (월/목) 07:00 KST
+    # 올영: 매일 07:00 KST (베스트 3페이지 ~300개)
     scheduler.add_job(
         run_oliveyoung,
-        CronTrigger(day_of_week="mon,thu", hour=7, minute=0),
+        CronTrigger(hour=7, minute=0),
         id="oliveyoung",
         replace_existing=True,
     )
 
-    # 다이소: 월 2회 (1일, 15일) 07:00 KST
+    # 다이소: 주 1회 (월) 07:00 KST (시즌 6페이지)
     scheduler.add_job(
         run_daiso,
-        CronTrigger(day="1,15", hour=7, minute=0),
+        CronTrigger(day_of_week="mon", hour=7, minute=0),
         id="daiso",
         replace_existing=True,
     )
