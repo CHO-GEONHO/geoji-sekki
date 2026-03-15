@@ -8,7 +8,7 @@ const SOURCE_CONFIG = {
 }
 
 const STORE_LABELS = {
-  gs25: 'GS25', cu: 'CU', seven: '세븐일레븐', emart24: '이마트24',
+  gs25: 'GS25', cu: 'CU', seven: '7-ELEVEn', emart24: '이마트24',
 }
 
 export default function FeedCard({ item }) {
