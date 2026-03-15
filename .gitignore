@@ -15,7 +15,8 @@ data/*.db-shm
 
 # Node
 node_modules/
-dist/
+# dist는 배포용으로 추적 (frontend/dist만 포함)
+frontend/node_modules/
 
 # Logs
 logs/*.log
