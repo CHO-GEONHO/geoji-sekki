@@ -113,8 +113,8 @@ class PpomppuCrawler(BaseCrawler):
         soup = BeautifulSoup(html, "lxml")
         items = []
 
-        # 뽐뿌 게시판 행 셀렉터 (실제: tr.list0, tr.list1)
-        rows = soup.select("tr.list0, tr.list1, tr.common-list0, tr.common-list1")
+        # 뽐뿌 게시판 행 셀렉터 (2025년 이후 리뉴얼: tr.baseList)
+        rows = soup.select("tr.baseList")
 
         for row in rows:
             try:
@@ -127,14 +127,16 @@ class PpomppuCrawler(BaseCrawler):
         return items
 
     def _parse_row(self, row: BeautifulSoup) -> Optional[dict]:
-        """게시글 행 파싱"""
-        # 제목 — 뽐뿌 실제 셀렉터 패턴 다양: a.list_subject_a, font.list_title a, etc.
-        title_el = row.select_one(
-            "a.list_subject_a, font.list_title a, td.list_title a, "
-            "a[href*='view.php'], a.title, td.title a"
-        )
+        """게시글 행 파싱 (2025년 이후 tr.baseList 구조)"""
+        # 제목 — a.baseList-title
+        title_el = row.select_one("a.baseList-title")
         if not title_el:
             return None
+
+        # em.baseList-head (카테고리 프리픽스 "[오늘의집]" 등) 제거 후 제목 추출
+        head_em = title_el.select_one("em.baseList-head")
+        if head_em:
+            head_em.decompose()
         title = title_el.get_text(strip=True)
         if not title or len(title) < 3:
             return None
@@ -145,16 +147,15 @@ class PpomppuCrawler(BaseCrawler):
         if not url or "view.php" not in url:
             return None
 
-        # 추천수
-        vote_el = row.select_one(
-            "td.list_vote, .symph_count, td:nth-child(5), .vote"
-        )
+        # 추천수 — td.baseList-rec (비어있으면 0, "추천-반대" 형식이면 첫 숫자만)
+        vote_el = row.select_one("td.baseList-rec")
         vote_text = vote_el.get_text(strip=True) if vote_el else "0"
-        vote_count = int(re.sub(r"[^\d\-]", "", vote_text) or "0")
+        vote_match = re.search(r"\d+", vote_text)
+        vote_count = int(vote_match.group()) if vote_match else 0
 
-        # 댓글수 — 제목 옆 [N] 패턴에서 추출
+        # 댓글수 — span.baseList-c
         comment_count = 0
-        comment_el = row.select_one(".list_comment2, .comment_count, .baseList-comment")
+        comment_el = row.select_one("span.baseList-c")
         if comment_el:
             comment_text = comment_el.get_text(strip=True)
             comment_count = int(re.sub(r"[^\d]", "", comment_text) or "0")
@@ -162,27 +163,31 @@ class PpomppuCrawler(BaseCrawler):
         # 가격 (제목에서 추출 시도)
         price_value = _parse_price(title)
 
-        # 이미지
-        img_el = row.select_one("img[src*='thumb'], img.list_img, img")
+        # 이미지 — a.baseList-thumb img
+        img_el = row.select_one("a.baseList-thumb img")
         image_url = ""
         if img_el:
             image_url = img_el.get("src", "") or img_el.get("data-src", "")
         if image_url and not image_url.startswith("http"):
             image_url = urljoin(BASE_URL, image_url)
 
-        # 작성 시간
-        date_el = row.select_one("td.list_date, .date, td.time, nobr")
+        # 작성 시간 — time.baseList-time
+        date_el = row.select_one("time.baseList-time")
         posted_at = None
         if date_el:
             date_text = date_el.get_text(strip=True)
             try:
-                if ":" in date_text and len(date_text) <= 5:
+                if ":" in date_text and len(date_text) <= 8:
+                    # "HH:MM:SS" or "HH:MM" — 오늘 날짜로 처리
+                    parts = date_text.split(":")
                     posted_at = datetime.now().replace(
-                        hour=int(date_text.split(":")[0]),
-                        minute=int(date_text.split(":")[1]),
-                        second=0, microsecond=0,
+                        hour=int(parts[0]),
+                        minute=int(parts[1]),
+                        second=int(parts[2]) if len(parts) > 2 else 0,
+                        microsecond=0,
                     )
                 elif "/" in date_text:
+                    # "MM/DD" 패턴
                     posted_at = datetime.strptime(date_text[:5], "%m/%d").replace(
                         year=datetime.now().year
                     )
@@ -191,8 +196,14 @@ class PpomppuCrawler(BaseCrawler):
             except (ValueError, IndexError):
                 pass
 
-        # 키워드 기반 카테고리 분류
-        category = _classify_by_keyword(title)
+        # 페이지에서 직접 제공하는 카테고리 사용 (small.baseList-small → "[의류/잡화]")
+        cat_el = row.select_one("small.baseList-small")
+        page_category = None
+        if cat_el:
+            page_category = cat_el.get_text(strip=True).strip("[]")
+
+        # 키워드 기반 카테고리 분류 (페이지 카테고리 없을 때 fallback)
+        category = page_category or _classify_by_keyword(title)
 
         return {
             "source": "ppomppu",

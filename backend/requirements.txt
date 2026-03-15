@@ -11,6 +11,7 @@ httpx==0.28.*
 beautifulsoup4==4.12.*
 lxml==5.3.*
 playwright==1.49.*
+curl_cffi==0.7.*
 
 # LLM (OpenAI SDK compatible - DeepSeek, Gemini)
 openai==1.61.*

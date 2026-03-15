@@ -1,18 +1,17 @@
-"""올리브영 세일/1+1 크롤러 (oliveyoung.co.kr).
+"""올리브영 세일/베스트 크롤러 (oliveyoung.co.kr).
 
-올리브영은 CSR 기반이라 모바일 웹 또는 내부 API 사용.
-m.oliveyoung.co.kr의 XHR 요청을 캡처하여 JSON API 직접 호출.
-API 없으면 Playwright headless로 fallback.
+curl_cffi로 Cloudflare를 브라우저 TLS 핑거프린트 모방하여 우회.
+httpx는 Cloudflare JS 챌린지에 막힘 → curl_cffi(impersonate="chrome131") 사용.
 
 크롤링 주기: 주 2회 (월/목) 07:00
-올영세일(3/6/9/12월), 올영데이(매월 25~27일) → 매일로 증가
+대상: 전체 판매 랭킹 베스트 (100위) — 할인율, 이벤트 배지 포함
 """
 
 from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime, date
+from datetime import datetime
 from typing import Optional
 from urllib.parse import urljoin
 
@@ -25,24 +24,34 @@ from backend.models import OliveyoungDeal
 
 logger = logging.getLogger("geojisekki.crawler.oliveyoung")
 
-# 올리브영 세일 페이지 URL
-SALE_URLS = {
-    "sale": "https://www.oliveyoung.co.kr/store/display/getMCategoryList.do?dispCatNo=100000100100001",
-    "best": "https://www.oliveyoung.co.kr/store/main/getBestList.do?dispCatNo=900000100100001&fltDispCatNo=&prdSort=01",
-}
+BEST_URL = (
+    "https://www.oliveyoung.co.kr/store/main/getBestList.do"
+    "?dispCatNo=900000100100001&fltDispCatNo=&prdSort=01"
+)
 
+# 카테고리 분류 (data-ref-goodscategory 또는 상품명 기반)
 CATEGORY_MAP = {
-    "스킨케어": ["스킨", "토너", "에센스", "세럼", "크림", "로션", "앰플", "마스크팩"],
-    "메이크업": ["파운데이션", "립", "아이", "블러셔", "쿠션", "틴트", "마스카라"],
-    "헤어": ["샴푸", "트리트먼트", "헤어", "린스", "에센스"],
-    "바디": ["바디", "핸드크림", "바디워시", "로션"],
-    "건강": ["비타민", "유산균", "오메가", "콜라겐", "프로바이오틱스", "영양제"],
+    "스킨케어": ["스킨", "토너", "에센스", "세럼", "크림", "로션", "앰플", "마스크팩", "시트팩", "클렌징"],
+    "메이크업": ["파운데이션", "립", "아이", "블러셔", "쿠션", "틴트", "마스카라", "베이스"],
+    "헤어": ["샴푸", "트리트먼트", "헤어", "린스", "헤어에센스"],
+    "바디": ["바디", "핸드크림", "바디워시", "로션", "선크림", "선케어"],
+    "건강": ["비타민", "유산균", "오메가", "콜라겐", "프로바이오틱스", "영양제", "건강기능"],
     "향수": ["향수", "퍼퓸", "오드"],
     "남성": ["남성", "맨즈", "쉐이빙"],
 }
 
 
-def _classify_oy_category(name: str, brand: str = "") -> str:
+def _classify_oy_category(name: str, brand: str = "", raw_cat: str = "") -> str:
+    """카테고리 분류 (페이지 제공 카테고리 우선, 없으면 키워드 매칭)."""
+    if raw_cat:
+        # "01 > 마스크팩 > 시트팩" 형태에서 중분류 추출
+        parts = [p.strip() for p in raw_cat.split(">")]
+        middle = parts[1] if len(parts) > 1 else ""
+        for category, keywords in CATEGORY_MAP.items():
+            for kw in keywords:
+                if kw in middle:
+                    return category
+
     text = f"{name} {brand}".lower()
     for category, keywords in CATEGORY_MAP.items():
         for kw in keywords:
@@ -51,102 +60,119 @@ def _classify_oy_category(name: str, brand: str = "") -> str:
     return "기타"
 
 
+def _parse_price(text: str) -> Optional[int]:
+    cleaned = re.sub(r"[^\d]", "", text)
+    return int(cleaned) if cleaned else None
+
+
 class OliveyoungCrawler(BaseCrawler):
     name = "oliveyoung"
     min_expected_items = 20
-    _use_playwright = False
 
     async def crawl(self) -> list[dict]:
-        """세일 상품 크롤링. Playwright 우선 (올리브영은 httpx에 403 반환)."""
-        items = []
-
-        # 1차: Playwright headless (올리브영은 JS 렌더링 + 봇 차단)
+        """curl_cffi로 Cloudflare 우회, 베스트셀러 상품 크롤링."""
         try:
-            items = await self._crawl_playwright()
+            items = await self._crawl_curl_cffi()
             if items:
                 return items
         except ImportError:
-            logger.warning("[oliveyoung] Playwright 미설치 — httpx fallback")
+            logger.warning("[oliveyoung] curl_cffi 미설치 — Playwright fallback")
         except Exception as e:
-            logger.warning("[oliveyoung] Playwright 실패: %s — httpx fallback", e)
+            logger.warning("[oliveyoung] curl_cffi 실패: %s — Playwright fallback", e)
 
-        # 2차: httpx (SSR 페이지)
+        # Fallback: Playwright
         try:
-            items = await self._crawl_httpx()
+            items = await self._crawl_playwright()
         except Exception as e:
-            logger.error("[oliveyoung] httpx도 실패: %s", e)
+            logger.error("[oliveyoung] Playwright도 실패: %s", e)
             raise
 
         return items
 
-    async def _crawl_httpx(self) -> list[dict]:
-        """httpx로 올리브영 세일 페이지 크롤링"""
-        items = []
-        for sale_type, url in SALE_URLS.items():
-            try:
-                html = await self.fetch(url)
-                soup = BeautifulSoup(html, "lxml")
-                products = self._parse_products(soup, sale_type)
-                items.extend(products)
-                logger.info("[oliveyoung] %s: %d개 수집 (httpx)", sale_type, len(products))
-                await self.delay()
-            except Exception as e:
-                logger.warning("[oliveyoung] %s httpx 실패: %s", sale_type, e)
-        return items
+    async def _crawl_curl_cffi(self) -> list[dict]:
+        """curl_cffi (Chrome TLS 핑거프린트 모방) 크롤링."""
+        from curl_cffi import requests as cf_requests
+
+        response = cf_requests.get(
+            BEST_URL,
+            impersonate="chrome131",
+            headers={"Accept-Language": "ko-KR,ko;q=0.9"},
+            timeout=30,
+        )
+        response.raise_for_status()
+
+        soup = BeautifulSoup(response.text, "lxml")
+        products = self._parse_products(soup)
+        logger.info("[oliveyoung] curl_cffi 수집: %d개", len(products))
+        return products
 
     async def _crawl_playwright(self) -> list[dict]:
-        """Playwright headless로 크롤링 (JS 렌더링 필요 시)"""
+        """Playwright headless fallback (stealth 설정 적용)."""
         from playwright.async_api import async_playwright
 
         items = []
         async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
+            browser = await p.chromium.launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-blink-features=AutomationControlled"],
+            )
+            context = await browser.new_context(
+                viewport={"width": 1280, "height": 800},
+                user_agent=(
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/131.0.0.0 Safari/537.36"
+                ),
+                locale="ko-KR",
+                timezone_id="Asia/Seoul",
+                extra_http_headers={"Accept-Language": "ko-KR,ko;q=0.9"},
+            )
+            # webdriver 감지 우회
+            await context.add_init_script(
+                "Object.defineProperty(navigator, 'webdriver', {get: () => undefined});"
+            )
 
-            for sale_type, url in SALE_URLS.items():
+            page = await context.new_page()
+            try:
+                await page.goto(BEST_URL, wait_until="domcontentloaded", timeout=30000)
+                # 상품이 로드될 때까지 대기
                 try:
-                    await page.goto(url, wait_until="networkidle", timeout=30000)
-                    # 스크롤 다운으로 lazy load 트리거
-                    for _ in range(3):
-                        await page.evaluate("window.scrollBy(0, 1000)")
-                        await page.wait_for_timeout(1000)
+                    await page.wait_for_selector(".prd_info", timeout=10000)
+                except Exception:
+                    pass
+                # 스크롤로 lazy load 트리거
+                for _ in range(3):
+                    await page.evaluate("window.scrollBy(0, 800)")
+                    await page.wait_for_timeout(800)
 
-                    html = await page.content()
-                    soup = BeautifulSoup(html, "lxml")
-                    products = self._parse_products(soup, sale_type)
-                    items.extend(products)
-                    logger.info("[oliveyoung] %s: %d개 수집 (playwright)", sale_type, len(products))
-                except Exception as e:
-                    logger.error("[oliveyoung] %s playwright 실패: %s", sale_type, e)
-
-            await browser.close()
+                html = await page.content()
+                soup = BeautifulSoup(html, "lxml")
+                items = self._parse_products(soup)
+                logger.info("[oliveyoung] Playwright 수집: %d개", len(items))
+            except Exception as e:
+                logger.error("[oliveyoung] Playwright 페이지 실패: %s", e)
+            finally:
+                await browser.close()
 
         return items
 
-    def _parse_products(self, soup: BeautifulSoup, sale_type: str) -> list[dict]:
-        """올리브영 상품 목록 파싱"""
+    def _parse_products(self, soup: BeautifulSoup) -> list[dict]:
+        """HTML에서 상품 목록 파싱."""
+        cards = soup.select("div.prd_info, li.prd_info")
         products = []
-
-        # 올리브영 상품 카드 셀렉터 — li.prd_info 또는 li 안에 상품 구조
-        cards = soup.select(
-            "li.prd_info, ul.prd_list li, .prd-list li, "
-            "[class*='prd_info'], [class*='product-item']"
-        )
-
-        for card in cards:
+        for rank, card in enumerate(cards, start=1):
             try:
-                product = self._parse_single(card, sale_type)
+                product = self._parse_single(card, rank)
                 if product:
                     products.append(product)
             except Exception as e:
                 logger.debug("[oliveyoung] 상품 파싱 실패: %s", e)
-
         return products
 
-    def _parse_single(self, card: BeautifulSoup, sale_type: str) -> Optional[dict]:
-        """단일 상품 파싱"""
+    def _parse_single(self, card: BeautifulSoup, rank: int) -> Optional[dict]:
+        """단일 상품 카드 파싱."""
         # 상품명
-        name_el = card.select_one(".prd_name, .product-name, a[class*='name']")
+        name_el = card.select_one(".tx_name, p.prd_name, .prd_name a")
         if not name_el:
             return None
         name = name_el.get_text(strip=True)
@@ -154,19 +180,18 @@ class OliveyoungCrawler(BaseCrawler):
             return None
 
         # 브랜드
-        brand_el = card.select_one(".prd_brand, .brand, [class*='brand']")
+        brand_el = card.select_one(".tx_brand")
         brand = brand_el.get_text(strip=True) if brand_el else ""
 
         # 정가
-        org_price_el = card.select_one(".org_price, .original-price, del, .price-original")
-        org_price_text = org_price_el.get_text(strip=True) if org_price_el else ""
-        original_price = int(re.sub(r"[^\d]", "", org_price_text) or "0") or None
+        org_el = card.select_one(".tx_org .tx_num")
+        original_price = _parse_price(org_el.get_text(strip=True)) if org_el else None
 
         # 할인가
-        sale_price_el = card.select_one(".sale_price, .final-price, .price-sale, .price")
-        sale_price_text = sale_price_el.get_text(strip=True) if sale_price_el else ""
-        sale_price = int(re.sub(r"[^\d]", "", sale_price_text) or "0") or None
-
+        cur_el = card.select_one(".tx_cur .tx_num")
+        if not cur_el:
+            return None
+        sale_price = _parse_price(cur_el.get_text(strip=True))
         if not sale_price:
             return None
 
@@ -175,34 +200,36 @@ class OliveyoungCrawler(BaseCrawler):
         if original_price and sale_price and original_price > sale_price:
             discount_rate = round((1 - sale_price / original_price) * 100)
 
-        # 이벤트 타입
-        event_type = sale_type
-        badge_el = card.select_one(".badge, .tag, [class*='event'], [class*='label']")
-        if badge_el:
-            badge_text = badge_el.get_text(strip=True).lower()
-            if "1+1" in badge_text:
+        # 이벤트 배지 (세일, 1+1, 쿠폰 등)
+        flags = [f.get_text(strip=True) for f in card.select(".icon_flag")]
+        event_type = "best"
+        for flag in flags:
+            if "1+1" in flag:
                 event_type = "1+1"
-            elif "픽" in badge_text or "pick" in badge_text:
-                event_type = "pick_special"
-            elif "한정" in badge_text or "limited" in badge_text:
-                event_type = "limited"
+                break
+            elif "2+1" in flag:
+                event_type = "2+1"
+                break
+            elif "세일" in flag:
+                event_type = "sale"
+                break
 
         # 이미지
         img_el = card.select_one("img")
         image_url = img_el.get("src", "") if img_el else ""
-        if image_url and not image_url.startswith("http"):
-            image_url = f"https://www.oliveyoung.co.kr{image_url}"
 
         # URL
-        link_el = card.select_one("a[href]")
-        url = ""
-        if link_el:
-            href = link_el.get("href", "")
-            url = urljoin("https://www.oliveyoung.co.kr", href)
+        link_el = card.select_one("a.prd_thumb, a[href*='getGoodsDetail']")
+        url = link_el.get("href", "") if link_el else ""
+        if url and not url.startswith("http"):
+            url = urljoin("https://www.oliveyoung.co.kr", url)
 
-        # 카테고리
-        category = _classify_oy_category(name, brand)
-        is_pick = event_type == "pick_special"
+        # 카테고리 (data-ref-goodscategory 활용)
+        cat_btn = card.select_one("[data-ref-goodscategory]")
+        raw_cat = cat_btn.get("data-ref-goodscategory", "") if cat_btn else ""
+        category = _classify_oy_category(name, brand, raw_cat)
+
+        is_pick = event_type in ("1+1", "2+1")
 
         return {
             "name": name,
