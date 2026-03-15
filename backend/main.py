@@ -4,7 +4,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -126,4 +126,10 @@ async def health_check(request: Request):
 # ── Static Files (Frontend build) — 반드시 마지막에 mount ──
 frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
 if frontend_dist.exists():
-    app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="static")
+    # SPA fallback: /api 이외의 모든 경로는 index.html 반환
+    @app.get("/{full_path:path}")
+    async def spa_fallback(full_path: str):
+        index = frontend_dist / "index.html"
+        return FileResponse(str(index))
+
+    app.mount("/assets", StaticFiles(directory=str(frontend_dist / "assets")), name="assets")
