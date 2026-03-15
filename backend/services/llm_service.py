@@ -13,7 +13,7 @@ logger = logging.getLogger("geojisekki.llm")
 
 
 class LLMService:
-    """DeepSeek (primary) + Gemini Flash (fallback) LLM 서비스."""
+    """Gemini Pro (피드 primary) + DeepSeek (크롤러 분류) + Gemini Flash (fallback) LLM 서비스."""
 
     def __init__(self):
         self._deepseek: Optional[AsyncOpenAI] = None
@@ -38,6 +38,37 @@ class LLMService:
                 base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
             )
         return self._gemini
+
+    async def chat_feed(
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        max_tokens: int = 4000,
+    ) -> dict:
+        """피드 생성 전용 — Gemini Pro 우선, 실패 시 DeepSeek fallback.
+
+        Gemini Pro는 긴 컨텍스트와 구조화된 출력에 강점.
+        """
+        providers = []
+        if self.gemini:
+            providers.append(("gemini", self.gemini, settings.gemini_pro_model))
+        providers.append(("deepseek", self.deepseek, settings.deepseek_model))
+
+        last_error = None
+        for provider_name, client, model in providers:
+            try:
+                result = await self._call(
+                    client, model, system_prompt, user_prompt,
+                    json_mode=True, max_tokens=max_tokens,
+                    provider_name=provider_name,
+                )
+                parsed = self._parse_json(result["content"])
+                return {"data": parsed, "model": result["model"], "tokens": result["tokens"]}
+            except Exception as e:
+                logger.warning("[%s] 피드 LLM 호출 실패: %s", provider_name, e)
+                last_error = e
+
+        raise RuntimeError(f"모든 LLM provider 실패. 마지막 에러: {last_error}")
 
     async def chat(
         self,

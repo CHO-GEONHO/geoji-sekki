@@ -8,8 +8,9 @@ class Settings(BaseSettings):
     deepseek_base_url: str = "https://api.deepseek.com"
     deepseek_model: str = "deepseek-chat"
 
-    # Gemini Flash (fallback)
+    # Gemini (피드 생성 primary + fallback)
     gemini_api_key: str = ""
+    gemini_pro_model: str = "gemini-1.5-pro"
 
     # App
     app_port: int = 8100

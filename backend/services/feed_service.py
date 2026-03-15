@@ -66,8 +66,8 @@ async def generate_daily_feed(target_date: Optional[date] = None) -> dict:
             f"오늘 수집된 데이터:\n{json.dumps(collected, ensure_ascii=False, indent=2)}"
         )
 
-        result = await llm_service.chat_json(
-            system_prompt, user_prompt, max_tokens=3000
+        result = await llm_service.chat_feed(
+            system_prompt, user_prompt, max_tokens=4000
         )
 
         items = result["data"]
@@ -99,17 +99,17 @@ async def generate_daily_feed(target_date: Optional[date] = None) -> dict:
 
 
 async def _collect_active_data(today: date) -> dict:
-    """오늘 기준 활성 데이터 수집"""
+    """오늘 기준 활성 데이터 수집 — 소스별 최대 5개, 할인율/인기 기준 정렬."""
     data = {}
 
     async with async_session() as session:
-        # 편의점: 이번 주 행사 상품 중 unit_price 기준 TOP 20
+        # 편의점: 이번 주 행사 상품 중 이벤트 타입별로 TOP 5씩 (1+1 우선)
         week_key = _get_week_key(today)
         cvs_result = await session.execute(
             select(CvsProduct)
             .where(CvsProduct.week_key == week_key)
             .order_by(CvsProduct.unit_price.asc())
-            .limit(20)
+            .limit(15)
         )
         cvs_items = cvs_result.scalars().all()
         if cvs_items:
@@ -118,17 +118,23 @@ async def _collect_active_data(today: date) -> dict:
                     "store": p.store, "name": p.name, "price": p.price,
                     "event_type": p.event_type, "category": p.category,
                     "unit_price": p.unit_price,
+                    # 실질 할인율 힌트 (1+1=50%, 2+1=33%)
+                    "effective_discount": (
+                        "50%" if p.event_type == "1+1" else
+                        "33%" if p.event_type == "2+1" else
+                        "직접할인"
+                    ),
                 }
                 for p in cvs_items
             ]
 
-        # 뽐뿌: 최근 24시간 추천수 상위 10
-        yesterday = datetime.combine(today - timedelta(days=1), datetime.min.time())
+        # 뽐뿌: 최근 48시간 추천수 상위 5 (더 넓게 수집)
+        two_days_ago = datetime.combine(today - timedelta(days=2), datetime.min.time())
         hotdeal_result = await session.execute(
             select(Hotdeal)
-            .where(Hotdeal.crawled_at >= yesterday)
+            .where(Hotdeal.crawled_at >= two_days_ago)
             .order_by(desc(Hotdeal.vote_count))
-            .limit(10)
+            .limit(5)
         )
         hotdeal_items = hotdeal_result.scalars().all()
         if hotdeal_items:
@@ -141,12 +147,12 @@ async def _collect_active_data(today: date) -> dict:
                 for h in hotdeal_items
             ]
 
-        # 올영: 현재 세일 진행 중 할인율 상위 10
+        # 올영: 할인율 상위 5개 (discount_rate DESC)
         oy_result = await session.execute(
             select(OliveyoungDeal)
             .where(OliveyoungDeal.discount_rate.isnot(None))
             .order_by(desc(OliveyoungDeal.discount_rate))
-            .limit(10)
+            .limit(5)
         )
         oy_items = oy_result.scalars().all()
         if oy_items:
@@ -161,13 +167,14 @@ async def _collect_active_data(today: date) -> dict:
                 for o in oy_items
             ]
 
-        # 다이소: 이번 달 AI 점수 상위 10
+        # 다이소: 이번 달 AI 점수 상위 5
         month_key = _get_month_key(today)
         daiso_result = await session.execute(
             select(DaisoProduct)
             .where(DaisoProduct.month_key == month_key)
+            .where(DaisoProduct.ai_score.isnot(None))
             .order_by(desc(DaisoProduct.ai_score))
-            .limit(10)
+            .limit(5)
         )
         daiso_items = daiso_result.scalars().all()
         if daiso_items:
