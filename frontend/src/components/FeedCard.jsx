@@ -70,6 +70,7 @@ export default function FeedCard({ item }) {
               src={image_url}
               alt={title}
               loading="lazy"
+              referrerPolicy="no-referrer"
               className="w-[72px] h-[72px] rounded-xl object-cover bg-gray-100 mt-1"
               onError={(e) => { e.target.style.display = 'none' }}
             />

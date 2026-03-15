@@ -112,11 +112,11 @@ async def _collect_active_data(today: date) -> dict:
             .limit(15)
         )
         cvs_items = cvs_result.scalars().all()
-        CVS_SEARCH_URL = {
-            "gs25": "https://www.gs25.com/goods/search.do?keyword=",
-            "cu": "https://cu.bgfretail.com/product/search.do?searchWord=",
-            "seven": "https://www.7eleven.co.kr/product/search.do?keyword=",
-            "emart24": "https://store.emart24.co.kr/goods/search?keyword=",
+        CVS_BRAND_URL = {
+            "gs25":    "https://pyony.com/brands/gs25/",
+            "cu":      "https://pyony.com/brands/cu/",
+            "seven":   "https://pyony.com/brands/seveneleven/",
+            "emart24": "https://pyony.com/brands/emart24/",
         }
         if cvs_items:
             data["cvs"] = [
@@ -130,7 +130,7 @@ async def _collect_active_data(today: date) -> dict:
                         "직접할인"
                     ),
                     "image_url": p.image_url,
-                    "url": CVS_SEARCH_URL.get(p.store, "") + p.name,
+                    "url": CVS_BRAND_URL.get(p.store, "https://pyony.com"),
                 }
                 for p in cvs_items
             ]
@@ -194,7 +194,7 @@ async def _collect_active_data(today: date) -> dict:
                     "category": d.category, "ai_score": d.ai_score,
                     "ai_comment": d.ai_comment,
                     "image_url": d.image_url,
-                    "url": f"https://www.daiso.co.kr/goods/search.do?searchText={d.name}",
+                    "url": d.url,
                 }
                 for d in daiso_items
             ]
