@@ -34,6 +34,12 @@ export default function TodayFeed() {
 
   return (
     <div>
+      {/* 슬로건 배너 */}
+      <div className="mb-4 rounded-2xl overflow-hidden bg-gradient-to-r from-geoji-600 to-geoji-500 p-4 text-white shadow-sm">
+        <p className="text-[11px] font-semibold opacity-80 mb-0.5 uppercase tracking-widest">오늘의 득템 포인트</p>
+        <p className="text-[15px] font-black leading-snug">우리 지갑은 항상 겨울이다<br /><span className="opacity-90 font-medium text-[13px]">하지만 거지세끼가 있으니까 괜찮아 🍚</span></p>
+      </div>
+
       {/* 날짜 네비게이션 */}
       <div className="flex items-center justify-between mb-4">
         <button

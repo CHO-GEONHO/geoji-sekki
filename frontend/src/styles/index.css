@@ -1,8 +1,9 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-/* Safe area (iOS notch/home bar) - v2 */
+/* Safe area (iOS notch/home bar) - v3 */
 .safe-bottom-v2 { padding-bottom: env(safe-area-inset-bottom, 16px); }
+.feed-banner { background: linear-gradient(135deg, #16a34a, #22c55e); }
 
 @layer base {
   html {

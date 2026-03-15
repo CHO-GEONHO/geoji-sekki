@@ -24,10 +24,20 @@ from backend.models import OliveyoungDeal
 
 logger = logging.getLogger("geojisekki.crawler.oliveyoung")
 
-BEST_URL = (
-    "https://www.oliveyoung.co.kr/store/main/getBestList.do"
-    "?dispCatNo=900000100100001&fltDispCatNo=&prdSort=01"
-)
+BEST_BASE = "https://www.oliveyoung.co.kr/store/main/getBestList.do"
+BEST_URL = f"{BEST_BASE}?dispCatNo=900000100100001&fltDispCatNo=&prdSort=01"
+
+# 올영 베스트 카테고리 필터 코드 (fltDispCatNo)
+# 전체 베스트 100위 + 카테고리별 베스트 각 100위 = 최대 700개 수집
+BEST_CATEGORIES = [
+    ("전체", ""),
+    ("스킨케어", "10000010001"),
+    ("메이크업", "10000010002"),
+    ("바디", "10000010004"),
+    ("헤어", "10000010003"),
+    ("향수/디퓨저", "10000010005"),
+    ("건강기능식품", "10000010006"),
+]
 
 # 카테고리 분류 (data-ref-goodscategory 또는 상품명 기반)
 CATEGORY_MAP = {
@@ -90,33 +100,74 @@ class OliveyoungCrawler(BaseCrawler):
         return items
 
     async def _crawl_curl_cffi(self) -> list[dict]:
-        """curl_cffi (Chrome TLS 핑거프린트 모방) 크롤링 — 최대 3페이지."""
+        """curl_cffi (Chrome TLS 핑거프린트 모방) 크롤링 — 전체 베스트 + 카테고리별."""
         from curl_cffi import requests as cf_requests
 
         all_products: list[dict] = []
         seen_names: set[str] = set()
 
-        for page_idx in range(1, 4):  # 1, 2, 3페이지 = 최대 300개
-            url = f"{BEST_URL}&pageIdx={page_idx}"
-            response = cf_requests.get(
-                url,
-                impersonate="chrome120",
-                headers={"Accept-Language": "ko-KR,ko;q=0.9"},
-                timeout=30,
-            )
-            response.raise_for_status()
+        # 1단계: 전체 베스트 페이지 + 카테고리 코드 추출
+        response = cf_requests.get(
+            BEST_URL,
+            impersonate="chrome120",
+            headers={"Accept-Language": "ko-KR,ko;q=0.9"},
+            timeout=30,
+        )
+        response.raise_for_status()
+        main_soup = BeautifulSoup(response.text, "lxml")
 
-            soup = BeautifulSoup(response.text, "lxml")
+        # 전체 베스트 상품 수집
+        for p in self._parse_products(main_soup):
+            if p["name"] not in seen_names:
+                seen_names.add(p["name"])
+                all_products.append(p)
+        logger.info("[oliveyoung] 전체 베스트: %d개", len(all_products))
+
+        # 카테고리 필터 탭에서 fltDispCatNo 추출
+        cat_codes: list[tuple[str, str]] = []
+        for a in main_soup.select("a[href*='fltDispCatNo=']"):
+            href = a.get("href", "")
+            import re as _re
+            m = _re.search(r"fltDispCatNo=(\d+)", href)
+            if m:
+                code = m.group(1)
+                if code and not any(c[1] == code for c in cat_codes):
+                    cat_name = a.get_text(strip=True) or code
+                    cat_codes.append((cat_name, code))
+
+        # 카테고리가 없으면 하드코딩 fallback
+        if not cat_codes:
+            cat_codes = [c for c in BEST_CATEGORIES if c[1]]
+            logger.info("[oliveyoung] 카테고리 파싱 실패 — 하드코딩 사용 (%d개)", len(cat_codes))
+
+        await self.delay()
+
+        # 2단계: 카테고리별 베스트 수집 (최대 6개 카테고리)
+        for cat_name, flt_cat_no in cat_codes[:6]:
+            url = f"{BEST_BASE}?dispCatNo=900000100100001&fltDispCatNo={flt_cat_no}&prdSort=01"
+            try:
+                resp = cf_requests.get(
+                    url,
+                    impersonate="chrome120",
+                    headers={"Accept-Language": "ko-KR,ko;q=0.9"},
+                    timeout=30,
+                )
+                resp.raise_for_status()
+            except Exception as e:
+                logger.warning("[oliveyoung] %s 카테고리 실패: %s", cat_name, e)
+                await self.delay()
+                continue
+
+            soup = BeautifulSoup(resp.text, "lxml")
             page_products = self._parse_products(soup)
-            if not page_products:
-                break
-
+            added = 0
             for p in page_products:
                 if p["name"] not in seen_names:
                     seen_names.add(p["name"])
                     all_products.append(p)
+                    added += 1
 
-            logger.info("[oliveyoung] page%d: %d개 수집", page_idx, len(page_products))
+            logger.info("[oliveyoung] %s: %d개 수집 (신규 %d개)", cat_name, len(page_products), added)
             await self.delay()
 
         logger.info("[oliveyoung] 전체 수집: %d개", len(all_products))

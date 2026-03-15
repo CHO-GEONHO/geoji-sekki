@@ -86,10 +86,10 @@ async def run_daily_report():
 def start_scheduler():
     """스케줄러 시작 — FastAPI lifespan에서 호출"""
 
-    # 편의점: 매주 월 06:00 KST
+    # 편의점: 매일 06:00 KST (이벤트 매일 갱신)
     scheduler.add_job(
         run_pyony,
-        CronTrigger(day_of_week="mon", hour=6, minute=0),
+        CronTrigger(hour=6, minute=0),
         id="pyony",
         replace_existing=True,
     )
@@ -124,10 +124,10 @@ def start_scheduler():
         replace_existing=True,
     )
 
-    # 피드 생성: 매일 07:30 KST
+    # 피드 생성: 2시간마다 (07:00~23:00 KST, 기존 항목 제외하고 신규 추가)
     scheduler.add_job(
         run_feed_generation,
-        CronTrigger(hour=7, minute=30),
+        CronTrigger(hour="7,9,11,13,15,17,19,21,23", minute=0),
         id="feed_generation",
         replace_existing=True,
     )

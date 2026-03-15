@@ -37,19 +37,17 @@ async def generate_daily_feed(target_date: Optional[date] = None) -> dict:
     today = target_date or date.today()
     date_str = today.isoformat()
 
-    # 이미 생성된 피드가 있으면 반환
+    # 이미 생성된 피드가 있으면 신규 항목만 추가 시도
+    existing_titles: set[str] = set()
     async with async_session() as session:
         existing = await session.execute(
             select(Feed).where(Feed.date == date_str)
         )
         feed = existing.scalar_one_or_none()
         if feed:
-            logger.info("[feed] %s 피드 이미 존재 — 스킵", date_str)
-            return {
-                "date": date_str,
-                "items": json.loads(feed.items),
-                "model": feed.model,
-            }
+            existing_items = json.loads(feed.items)
+            existing_titles = {item.get("title", "") for item in existing_items}
+            logger.info("[feed] %s 피드 이미 존재 (%d개) — 신규 항목 확인", date_str, len(existing_items))
 
     try:
         # 1. 활성 데이터 수집
@@ -61,35 +59,60 @@ async def generate_daily_feed(target_date: Optional[date] = None) -> dict:
 
         # 2. LLM 호출
         system_prompt = PROMPT_PATH.read_text(encoding="utf-8")
+        already_covered = (
+            f"\n\n이미 오늘 피드에 있는 항목 제목 (중복 금지):\n"
+            + "\n".join(f"- {t}" for t in existing_titles)
+            if existing_titles else ""
+        )
         user_prompt = (
             f"오늘 날짜: {date_str}\n\n"
             f"오늘 수집된 데이터:\n{json.dumps(collected, ensure_ascii=False, indent=2)}"
+            f"{already_covered}"
         )
 
         result = await llm_service.chat_feed(
             system_prompt, user_prompt, max_tokens=4000
         )
 
-        items = result["data"]
-        if isinstance(items, dict):
-            items = items.get("items", items.get("feed", []))
+        new_items = result["data"]
+        if isinstance(new_items, dict):
+            new_items = new_items.get("items", new_items.get("feed", []))
 
-        # 3. 저장
+        # 기존 항목과 중복 제목 필터링
+        new_items = [i for i in new_items if i.get("title", "") not in existing_titles]
+
+        # 3. 저장 (기존 피드가 있으면 append, 없으면 신규 생성)
         async with async_session() as session:
-            feed = Feed(
-                date=date_str,
-                items=json.dumps(items, ensure_ascii=False),
-                model=result["model"],
-                prompt_tokens=result["tokens"]["prompt"],
-                completion_tokens=result["tokens"]["completion"],
+            existing_row = await session.execute(
+                select(Feed).where(Feed.date == date_str)
             )
-            session.add(feed)
-            await session.commit()
+            feed_row = existing_row.scalar_one_or_none()
 
-        logger.info(
-            "[feed] %s 피드 생성 완료: %d개 아이템, model=%s",
-            date_str, len(items), result["model"],
-        )
+            if feed_row and new_items:
+                # 기존 피드에 신규 항목 추가
+                all_items = json.loads(feed_row.items) + new_items
+                feed_row.items = json.dumps(all_items, ensure_ascii=False)
+                feed_row.model = result["model"]
+                items = all_items
+                logger.info("[feed] %s 피드 업데이트: +%d개 추가 (총 %d개)", date_str, len(new_items), len(all_items))
+            elif feed_row:
+                # 신규 항목 없음
+                logger.info("[feed] %s 피드 신규 항목 없음 — 유지", date_str)
+                items = json.loads(feed_row.items)
+            else:
+                # 오늘 첫 피드 생성
+                items = new_items
+                feed_row = Feed(
+                    date=date_str,
+                    items=json.dumps(items, ensure_ascii=False),
+                    model=result["model"],
+                    prompt_tokens=result["tokens"]["prompt"],
+                    completion_tokens=result["tokens"]["completion"],
+                )
+                session.add(feed_row)
+                logger.info("[feed] %s 피드 신규 생성: %d개", date_str, len(items))
+
+            await session.commit()
 
         return {"date": date_str, "items": items, "model": result["model"]}
 
