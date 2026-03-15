@@ -112,19 +112,25 @@ async def _collect_active_data(today: date) -> dict:
             .limit(15)
         )
         cvs_items = cvs_result.scalars().all()
+        CVS_SEARCH_URL = {
+            "gs25": "https://www.gs25.com/goods/search.do?keyword=",
+            "cu": "https://cu.bgfretail.com/product/search.do?searchWord=",
+            "seven": "https://www.7eleven.co.kr/product/search.do?keyword=",
+            "emart24": "https://store.emart24.co.kr/goods/search?keyword=",
+        }
         if cvs_items:
             data["cvs"] = [
                 {
                     "store": p.store, "name": p.name, "price": p.price,
                     "event_type": p.event_type, "category": p.category,
                     "unit_price": p.unit_price,
-                    # 실질 할인율 힌트 (1+1=50%, 2+1=33%)
                     "effective_discount": (
                         "50%" if p.event_type == "1+1" else
                         "33%" if p.event_type == "2+1" else
                         "직접할인"
                     ),
                     "image_url": p.image_url,
+                    "url": CVS_SEARCH_URL.get(p.store, "") + p.name,
                 }
                 for p in cvs_items
             ]
@@ -166,6 +172,7 @@ async def _collect_active_data(today: date) -> dict:
                     "discount_rate": o.discount_rate,
                     "event_type": o.event_type, "category": o.category,
                     "image_url": o.image_url,
+                    "url": o.url,
                 }
                 for o in oy_items
             ]
@@ -187,6 +194,7 @@ async def _collect_active_data(today: date) -> dict:
                     "category": d.category, "ai_score": d.ai_score,
                     "ai_comment": d.ai_comment,
                     "image_url": d.image_url,
+                    "url": f"https://www.daiso.co.kr/goods/search.do?searchText={d.name}",
                 }
                 for d in daiso_items
             ]
