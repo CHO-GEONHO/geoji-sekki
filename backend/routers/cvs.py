@@ -65,8 +65,20 @@ async def get_cvs_products(
     result = await db.execute(query)
     items = result.scalars().all()
 
+    CVS_BRAND_URL = {
+        "gs25":    "https://pyony.com/brands/gs25/",
+        "cu":      "https://pyony.com/brands/cu/",
+        "seven":   "https://pyony.com/brands/seveneleven/",
+        "emart24": "https://pyony.com/brands/emart24/",
+    }
+
+    def _cvs_out(p: CvsProduct) -> CvsProductOut:
+        out = CvsProductOut.model_validate(p)
+        out.url = CVS_BRAND_URL.get(p.store, "https://pyony.com")
+        return out
+
     return {
-        "items": [CvsProductOut.model_validate(i) for i in items],
+        "items": [_cvs_out(i) for i in items],
         "total": total,
         "page": page,
         "page_size": page_size,

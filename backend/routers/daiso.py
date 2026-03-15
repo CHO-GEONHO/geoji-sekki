@@ -50,8 +50,15 @@ async def get_daiso_products(
     result = await db.execute(query)
     items = result.scalars().all()
 
+    from urllib.parse import quote
+
+    def _daiso_out(d: DaisoProduct) -> DaisoProductOut:
+        out = DaisoProductOut.model_validate(d)
+        out.url = f"https://www.daiso.co.kr/search?search={quote(d.name)}"
+        return out
+
     return {
-        "items": [DaisoProductOut.model_validate(i) for i in items],
+        "items": [_daiso_out(i) for i in items],
         "total": total,
         "page": page,
         "page_size": page_size,

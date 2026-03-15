@@ -16,6 +16,7 @@ class CvsProductOut(BaseModel):
     category: Optional[str] = None
     unit_price: Optional[int] = None
     image_url: Optional[str] = None
+    url: Optional[str] = None
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     week_key: str

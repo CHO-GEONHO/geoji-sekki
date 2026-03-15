@@ -15,14 +15,22 @@ const EVENT_BADGES = {
 export default function ProductCard({ product, type = 'cvs' }) {
   const badge = EVENT_BADGES[product.event_type] || EVENT_BADGES['discount']
 
+  const handleClick = () => {
+    if (product.url) window.open(product.url, '_blank', 'noopener,noreferrer')
+  }
+
   return (
-    <div className="card mb-2 flex gap-3 active:scale-[0.98] transition-transform">
+    <div
+      className={`card mb-2 flex gap-3 active:scale-[0.98] transition-transform ${product.url ? 'cursor-pointer' : ''}`}
+      onClick={product.url ? handleClick : undefined}
+    >
       {/* 이미지 */}
       {product.image_url && (
         <img
           src={product.image_url}
           alt={product.name}
           loading="lazy"
+          referrerPolicy="no-referrer"
           className="w-16 h-16 rounded-lg object-cover flex-shrink-0 bg-gray-100"
           onError={(e) => { e.target.style.display = 'none' }}
         />
