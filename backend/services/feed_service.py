@@ -124,6 +124,7 @@ async def _collect_active_data(today: date) -> dict:
                         "33%" if p.event_type == "2+1" else
                         "직접할인"
                     ),
+                    "image_url": p.image_url,
                 }
                 for p in cvs_items
             ]
@@ -143,6 +144,7 @@ async def _collect_active_data(today: date) -> dict:
                     "title": h.title, "price_value": h.price_value,
                     "vote_count": h.vote_count, "category": h.category,
                     "summary": h.summary, "url": h.url,
+                    "image_url": h.image_url,
                 }
                 for h in hotdeal_items
             ]
@@ -163,6 +165,7 @@ async def _collect_active_data(today: date) -> dict:
                     "sale_price": o.sale_price,
                     "discount_rate": o.discount_rate,
                     "event_type": o.event_type, "category": o.category,
+                    "image_url": o.image_url,
                 }
                 for o in oy_items
             ]
@@ -183,6 +186,7 @@ async def _collect_active_data(today: date) -> dict:
                     "name": d.name, "price": d.price,
                     "category": d.category, "ai_score": d.ai_score,
                     "ai_comment": d.ai_comment,
+                    "image_url": d.image_url,
                 }
                 for d in daiso_items
             ]

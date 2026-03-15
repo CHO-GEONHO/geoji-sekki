@@ -1,43 +1,80 @@
 import ShareButton from './ShareButton'
-import StoreTag from './StoreTag'
 
-const SOURCE_COLORS = {
-  cvs: 'bg-blue-100 text-blue-700',
-  hotdeal: 'bg-red-100 text-red-700',
-  oliveyoung: 'bg-purple-100 text-purple-700',
-  daiso: 'bg-yellow-100 text-yellow-700',
+const SOURCE_CONFIG = {
+  cvs:        { label: '편의점', color: 'bg-blue-500',   text: 'text-white' },
+  hotdeal:    { label: '핫딜',   color: 'bg-red-500',    text: 'text-white' },
+  oliveyoung: { label: '올영',   color: 'bg-violet-500', text: 'text-white' },
+  daiso:      { label: '다이소', color: 'bg-yellow-400', text: 'text-gray-900' },
 }
 
-const SOURCE_LABELS = {
-  cvs: '편의점',
-  hotdeal: '핫딜',
-  oliveyoung: '올영',
-  daiso: '다이소',
+const STORE_LABELS = {
+  gs25: 'GS25', cu: 'CU', seven: '세븐일레븐', emart24: '이마트24',
 }
 
 export default function FeedCard({ item }) {
-  const { title, body, source, store, category } = item
+  const { title, body, source, store, category, keyword, image_url, url } = item
+  const cfg = SOURCE_CONFIG[source] || { label: source, color: 'bg-gray-400', text: 'text-white' }
+
+  const handleClick = () => {
+    if (url) window.open(url, '_blank', 'noopener,noreferrer')
+  }
 
   return (
-    <div className="card mb-3 active:scale-[0.98] transition-transform">
-      <div className="flex items-start justify-between gap-2">
+    <div
+      className={`bg-white rounded-2xl border border-gray-100 shadow-sm mb-3 overflow-hidden active:scale-[0.98] transition-transform ${url ? 'cursor-pointer' : ''}`}
+      onClick={url ? handleClick : undefined}
+    >
+      <div className="flex gap-3 p-4">
+        {/* 왼쪽: 텍스트 */}
         <div className="flex-1 min-w-0">
-          <h3 className="font-bold text-base leading-snug mb-1.5">{title}</h3>
-          <p className="text-sm text-gray-600 whitespace-pre-line leading-relaxed">
+          {/* 키워드 태그 */}
+          {keyword && (
+            <span className={`inline-block ${cfg.color} ${cfg.text} text-xs font-bold px-2 py-0.5 rounded-full mb-2`}>
+              {keyword}
+            </span>
+          )}
+
+          {/* 제목 */}
+          <h3 className="font-bold text-[15px] leading-snug text-gray-900 mb-1.5">
+            {title}
+          </h3>
+
+          {/* 본문 */}
+          <p className="text-[13px] text-gray-400 leading-relaxed whitespace-pre-line">
             {body}
           </p>
-        </div>
-        <ShareButton title={title} text={`${title}\n${body}`} />
-      </div>
 
-      <div className="flex items-center gap-2 mt-3">
-        <span className={`badge ${SOURCE_COLORS[source] || 'bg-gray-100 text-gray-600'}`}>
-          {SOURCE_LABELS[source] || source}
-        </span>
-        {store && <StoreTag store={store} />}
-        {category && (
-          <span className="badge bg-gray-50 text-gray-500">{category}</span>
-        )}
+          {/* 하단 배지 */}
+          <div className="flex items-center gap-1.5 mt-2.5">
+            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${cfg.color} ${cfg.text}`}>
+              {cfg.label}
+            </span>
+            {store && STORE_LABELS[store] && (
+              <span className="text-[11px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full font-medium">
+                {STORE_LABELS[store]}
+              </span>
+            )}
+            {category && (
+              <span className="text-[11px] text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">
+                {category}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* 오른쪽: 이미지 + 공유 */}
+        <div className="flex flex-col items-end gap-2 flex-shrink-0">
+          <ShareButton title={title} text={`${title}\n${body}`} />
+          {image_url && (
+            <img
+              src={image_url}
+              alt={title}
+              loading="lazy"
+              className="w-[72px] h-[72px] rounded-xl object-cover bg-gray-100 mt-1"
+              onError={(e) => { e.target.style.display = 'none' }}
+            />
+          )}
+        </div>
       </div>
     </div>
   )

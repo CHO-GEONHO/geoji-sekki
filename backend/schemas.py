@@ -107,6 +107,8 @@ class FeedItem(BaseModel):
     category: Optional[str] = None
     priority: int = 0
     url: Optional[str] = None
+    image_url: Optional[str] = None
+    keyword: Optional[str] = None
 
 
 class FeedOut(BaseModel):
