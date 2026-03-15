@@ -1,6 +1,8 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+/* Safe area (iOS notch/home bar) - v2 */
+.safe-bottom-v2 { padding-bottom: env(safe-area-inset-bottom, 16px); }
 
 @layer base {
   html {
