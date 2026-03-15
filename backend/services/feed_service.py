@@ -194,7 +194,7 @@ async def _collect_active_data(today: date) -> dict:
                     "category": d.category, "ai_score": d.ai_score,
                     "ai_comment": d.ai_comment,
                     "image_url": d.image_url,
-                    "url": d.url,
+                    "url": f"https://www.daiso.co.kr/search?search={d.name}",
                 }
                 for d in daiso_items
             ]
