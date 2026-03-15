@@ -10,7 +10,7 @@ class Settings(BaseSettings):
 
     # Gemini (피드 생성 primary + fallback)
     gemini_api_key: str = ""
-    gemini_pro_model: str = "gemini-1.5-pro"
+    gemini_pro_model: str = "gemini-2.5-pro"
 
     # App
     app_port: int = 8100
