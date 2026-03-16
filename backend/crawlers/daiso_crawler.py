@@ -16,6 +16,7 @@ from urllib.parse import urljoin
 
 import httpx
 from bs4 import BeautifulSoup
+from sqlalchemy import delete
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from backend.crawlers.base import BaseCrawler
@@ -227,6 +228,7 @@ class DaisoCrawler(BaseCrawler):
         if not items:
             return 0
 
+        current_month = items[0]["month_key"]  # 이번 크롤의 month_key
         async with async_session() as session:
             saved = 0
             for item in items:
@@ -246,6 +248,14 @@ class DaisoCrawler(BaseCrawler):
                 )
                 await session.execute(stmt)
                 saved += 1
+
+            # 지난 달 다이소 데이터 삭제
+            result = await session.execute(
+                delete(DaisoProduct).where(DaisoProduct.month_key < current_month)
+            )
+            deleted = result.rowcount
+            if deleted:
+                logger.info("[daiso] 이전 월 stale 항목 %d개 삭제", deleted)
 
             await session.commit()
             return saved

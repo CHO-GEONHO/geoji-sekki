@@ -16,6 +16,7 @@ from typing import Optional
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
+from sqlalchemy import delete
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from backend.crawlers.base import BaseCrawler
@@ -317,6 +318,7 @@ class OliveyoungCrawler(BaseCrawler):
         if not items:
             return 0
 
+        crawl_started = datetime.utcnow()
         async with async_session() as session:
             saved = 0
             for item in items:
@@ -335,6 +337,14 @@ class OliveyoungCrawler(BaseCrawler):
                 )
                 await session.execute(stmt)
                 saved += 1
+
+            # 이번 크롤에 없던 올리브영 상품 삭제 (세일 종료된 항목)
+            result = await session.execute(
+                delete(OliveyoungDeal).where(OliveyoungDeal.crawled_at < crawl_started)
+            )
+            deleted = result.rowcount
+            if deleted:
+                logger.info("[oliveyoung] stale 항목 %d개 삭제", deleted)
 
             await session.commit()
             return saved

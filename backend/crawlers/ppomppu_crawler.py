@@ -18,6 +18,8 @@ import httpx
 from bs4 import BeautifulSoup
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
+from sqlalchemy import delete
+
 from backend.crawlers.base import BaseCrawler, USER_AGENTS
 from backend.database import async_session
 from backend.models import Hotdeal
@@ -260,6 +262,7 @@ class PpomppuCrawler(BaseCrawler):
         if not items:
             return 0
 
+        crawl_started = datetime.utcnow()
         async with async_session() as session:
             saved = 0
             for item in items:
@@ -276,6 +279,17 @@ class PpomppuCrawler(BaseCrawler):
                 )
                 await session.execute(stmt)
                 saved += 1
+
+            # 이번 크롤에 없던 뽐뿌 게시글 삭제 (만료/삭제된 핫딜)
+            result = await session.execute(
+                delete(Hotdeal).where(
+                    Hotdeal.source == "ppomppu",
+                    Hotdeal.crawled_at < crawl_started,
+                )
+            )
+            deleted = result.rowcount
+            if deleted:
+                logger.info("[ppomppu] stale 항목 %d개 삭제", deleted)
 
             await session.commit()
             return saved

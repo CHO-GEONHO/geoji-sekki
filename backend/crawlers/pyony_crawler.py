@@ -13,6 +13,7 @@ from datetime import datetime, date
 from typing import Optional
 
 from bs4 import BeautifulSoup
+from sqlalchemy import delete
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from backend.crawlers.base import BaseCrawler
@@ -213,6 +214,7 @@ class PyonyCrawler(BaseCrawler):
         if not items:
             return 0
 
+        current_week = items[0]["week_key"]  # 이번 크롤의 week_key
         async with async_session() as session:
             saved = 0
             for item in items:
@@ -230,6 +232,14 @@ class PyonyCrawler(BaseCrawler):
                 )
                 await session.execute(stmt)
                 saved += 1
+
+            # 지난 주차 편의점 데이터 삭제
+            result = await session.execute(
+                delete(CvsProduct).where(CvsProduct.week_key < current_week)
+            )
+            deleted = result.rowcount
+            if deleted:
+                logger.info("[pyony] 이전 주차 stale 항목 %d개 삭제", deleted)
 
             await session.commit()
             return saved

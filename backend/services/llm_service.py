@@ -167,8 +167,10 @@ class LLMService:
         }
 
     @staticmethod
-    def _parse_json(text: str):
+    def _parse_json(text):
         """JSON 파싱 + 마크다운 코드블럭 제거 fallback."""
+        if not text:
+            raise ValueError("LLM 응답이 비어있음 (None or empty)")
         text = text.strip()
 
         # 1차: 직접 파싱
