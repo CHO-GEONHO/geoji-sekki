@@ -3,11 +3,13 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 from typing import Optional
 
 from openai import AsyncOpenAI
 
 from backend.config import settings
+from backend.services import usage_logger
 
 logger = logging.getLogger("geojisekki.llm")
 
@@ -115,33 +117,46 @@ class LLMService:
         if json_mode:
             kwargs["response_format"] = {"type": "json_object"}
 
-        response = await client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            max_tokens=max_tokens,
-            temperature=0.7,
-            **kwargs,
-        )
+        t0 = time.monotonic()
+        try:
+            response = await client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                max_tokens=max_tokens,
+                temperature=0.7,
+                **kwargs,
+            )
+        except Exception:
+            await usage_logger.record(provider_name, error=True)
+            raise
 
+        latency_ms = (time.monotonic() - t0) * 1000
         content = response.choices[0].message.content
         usage = response.usage
+        input_tokens = usage.prompt_tokens if usage else 0
+        output_tokens = usage.completion_tokens if usage else 0
 
         logger.info(
             "[%s] model=%s, prompt_tokens=%d, completion_tokens=%d",
-            provider_name, model,
-            usage.prompt_tokens if usage else 0,
-            usage.completion_tokens if usage else 0,
+            provider_name, model, input_tokens, output_tokens,
+        )
+
+        await usage_logger.record(
+            provider_name,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            latency_ms=latency_ms,
         )
 
         return {
             "content": content,
             "model": model,
             "tokens": {
-                "prompt": usage.prompt_tokens if usage else 0,
-                "completion": usage.completion_tokens if usage else 0,
+                "prompt": input_tokens,
+                "completion": output_tokens,
             },
         }
 
