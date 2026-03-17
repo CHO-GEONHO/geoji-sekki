@@ -16,7 +16,7 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
-from sqlalchemy import select, desc, func
+from sqlalchemy import select, desc, func, exists
 
 from backend.database import async_session
 from backend.models import CvsProduct, Hotdeal, OliveyoungDeal, DaisoProduct, Feed
@@ -38,6 +38,7 @@ async def generate_daily_feed(target_date: Optional[date] = None) -> dict:
     date_str = today.isoformat()
 
     # 이미 생성된 피드가 있으면 신규 항목만 추가 시도
+    existing_items: list = []
     existing_titles: set[str] = set()
     async with async_session() as session:
         existing = await session.execute(
@@ -46,6 +47,8 @@ async def generate_daily_feed(target_date: Optional[date] = None) -> dict:
         feed = existing.scalar_one_or_none()
         if feed:
             existing_items = json.loads(feed.items)
+            # 만료된 항목 먼저 제거
+            existing_items = await _filter_stale_items(existing_items, today)
             existing_titles = {item.get("title", "") for item in existing_items}
             logger.info("[feed] %s 피드 이미 존재 (%d개) — 신규 항목 확인", date_str, len(existing_items))
 
@@ -89,16 +92,17 @@ async def generate_daily_feed(target_date: Optional[date] = None) -> dict:
             feed_row = existing_row.scalar_one_or_none()
 
             if feed_row and new_items:
-                # 기존 피드에 신규 항목 추가
-                all_items = json.loads(feed_row.items) + new_items
+                # 기존 피드에 신규 항목 추가 (existing_items는 이미 stale 제거된 상태)
+                all_items = existing_items + new_items
                 feed_row.items = json.dumps(all_items, ensure_ascii=False)
                 feed_row.model = result["model"]
                 items = all_items
                 logger.info("[feed] %s 피드 업데이트: +%d개 추가 (총 %d개)", date_str, len(new_items), len(all_items))
             elif feed_row:
-                # 신규 항목 없음
-                logger.info("[feed] %s 피드 신규 항목 없음 — 유지", date_str)
-                items = json.loads(feed_row.items)
+                # 신규 항목 없음 — stale 제거 결과만 반영
+                feed_row.items = json.dumps(existing_items, ensure_ascii=False)
+                logger.info("[feed] %s 피드 신규 항목 없음 — 유지 (%d개)", date_str, len(existing_items))
+                items = existing_items
             else:
                 # 오늘 첫 피드 생성
                 items = new_items
@@ -223,6 +227,61 @@ async def _collect_active_data(today: date) -> dict:
             ]
 
     return data
+
+
+async def _filter_stale_items(items: list[dict], today: date) -> list[dict]:
+    """피드 항목 중 DB에서 삭제된 항목 제거."""
+    week_key = _get_week_key(today)
+    month_key = _get_month_key(today)
+    valid = []
+
+    async with async_session() as session:
+        for item in items:
+            source = item.get("source", "")
+            url = item.get("url", "")
+
+            if source == "hotdeal" and url:
+                row = await session.execute(
+                    select(Hotdeal.id).where(Hotdeal.url == url).limit(1)
+                )
+                if row.scalar_one_or_none() is None:
+                    logger.info("[feed] 만료 핫딜 제거: %s", item.get("title", ""))
+                    continue
+
+            elif source == "oliveyoung" and url:
+                row = await session.execute(
+                    select(OliveyoungDeal.id).where(OliveyoungDeal.url == url).limit(1)
+                )
+                if row.scalar_one_or_none() is None:
+                    logger.info("[feed] 만료 올영 상품 제거: %s", item.get("title", ""))
+                    continue
+
+            elif source == "cvs":
+                store = item.get("store", "")
+                row = await session.execute(
+                    select(CvsProduct.id)
+                    .where(CvsProduct.week_key == week_key)
+                    .where(CvsProduct.store == store if store else True)
+                    .limit(1)
+                )
+                if row.scalar_one_or_none() is None:
+                    logger.info("[feed] 만료 편의점 항목 제거: %s", item.get("title", ""))
+                    continue
+
+            elif source == "daiso":
+                row = await session.execute(
+                    select(DaisoProduct.id).where(DaisoProduct.month_key == month_key).limit(1)
+                )
+                if row.scalar_one_or_none() is None:
+                    logger.info("[feed] 만료 다이소 항목 제거: %s", item.get("title", ""))
+                    continue
+
+            valid.append(item)
+
+    removed = len(items) - len(valid)
+    if removed:
+        logger.info("[feed] stale 피드 항목 %d개 제거", removed)
+    return valid
 
 
 async def _fallback_yesterday(today: date) -> dict:
