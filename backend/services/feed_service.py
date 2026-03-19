@@ -52,6 +52,16 @@ async def generate_daily_feed(target_date: Optional[date] = None) -> dict:
             existing_titles = {item.get("title", "") for item in existing_items}
             logger.info("[feed] %s 피드 이미 존재 (%d개) — 신규 항목 확인", date_str, len(existing_items))
 
+        # 어제 피드 제목도 중복 금지 목록에 포함 (전날 항목 재등장 방지)
+        yesterday_str = (today - timedelta(days=1)).isoformat()
+        yesterday_result = await session.execute(
+            select(Feed).where(Feed.date == yesterday_str)
+        )
+        yesterday_feed = yesterday_result.scalar_one_or_none()
+        if yesterday_feed:
+            yesterday_titles = {item.get("title", "") for item in json.loads(yesterday_feed.items)}
+            existing_titles |= yesterday_titles
+
     try:
         # 1. 활성 데이터 수집
         collected = await _collect_active_data(today)
