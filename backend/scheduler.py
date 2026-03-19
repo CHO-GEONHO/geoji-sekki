@@ -4,12 +4,13 @@ FastAPI lifespan에서 start_scheduler()로 시작.
 모든 시간은 KST (Asia/Seoul).
 
 스케줄:
-  편의점:   매주 월 06:00
-  뽐뿌:    매일 08:00, 18:00
-  올영:    주 2회 (월/목) 07:00
-  다이소:   월 2회 (1일, 15일) 07:00
-  피드 생성: 매일 07:30
-  일일 리포트: 매일 08:00
+  편의점:     매일 06:00
+  뽐뿌:      매일 08:00, 18:00
+  에펨코리아: 매일 10:00, 20:00
+  올영:      매일 07:00
+  다이소:    주 1회 (월) 07:00
+  피드 생성:  매일 07:00~23:00 (2시간마다)
+  일일 리포트: 매일 20:00
 """
 
 import asyncio
@@ -44,6 +45,17 @@ async def run_ppomppu():
         await notify_crawl_result("ppomppu", "success", count, 0)
     except Exception as e:
         await notify_crawl_result("ppomppu", "failed", 0, 0, str(e))
+
+
+async def run_fmkorea():
+    from backend.crawlers.fmkorea_crawler import FmkoreaCrawler
+    from backend.services.telegram_service import notify_crawl_result
+    crawler = FmkoreaCrawler()
+    try:
+        count = await crawler.run()
+        await notify_crawl_result("fmkorea", "success", count, 0)
+    except Exception as e:
+        await notify_crawl_result("fmkorea", "failed", 0, 0, str(e))
 
 
 async def run_oliveyoung():
@@ -105,6 +117,20 @@ def start_scheduler():
         run_ppomppu,
         CronTrigger(hour=18, minute=0),
         id="ppomppu_evening",
+        replace_existing=True,
+    )
+
+    # 에펨코리아: 매일 10:00, 20:00 KST
+    scheduler.add_job(
+        run_fmkorea,
+        CronTrigger(hour=10, minute=0),
+        id="fmkorea_morning",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_fmkorea,
+        CronTrigger(hour=20, minute=0),
+        id="fmkorea_evening",
         replace_existing=True,
     )
 

@@ -162,20 +162,25 @@ async def _collect_active_data(today: date) -> dict:
                 for p in cvs_items
             ]
 
-        # 뽐뿌: 최근 48시간 추천수 상위 5 (더 넓게 수집)
+        # 핫딜 (뽐뿌 + 에펨코리아): 최근 48시간, 소스별 추천수 상위 8개씩
         two_days_ago = datetime.combine(today - timedelta(days=2), datetime.min.time())
-        hotdeal_result = await session.execute(
-            select(Hotdeal)
-            .where(Hotdeal.crawled_at >= two_days_ago)
-            .order_by(desc(Hotdeal.vote_count))
-            .limit(5)
-        )
-        hotdeal_items = hotdeal_result.scalars().all()
+        hotdeal_items = []
+        for source in ("ppomppu", "fmkorea"):
+            result = await session.execute(
+                select(Hotdeal)
+                .where(Hotdeal.source == source)
+                .where(Hotdeal.crawled_at >= two_days_ago)
+                .order_by(desc(Hotdeal.vote_count))
+                .limit(8)
+            )
+            hotdeal_items.extend(result.scalars().all())
+
         if hotdeal_items:
             data["hotdeals"] = [
                 {
                     "title": h.title, "price_value": h.price_value,
                     "vote_count": h.vote_count, "category": h.category,
+                    "source_site": h.source,
                     "summary": h.summary, "url": h.url,
                     "image_url": h.image_url,
                 }
