@@ -54,7 +54,7 @@ async def get_daiso_products(
 
     def _daiso_out(d: DaisoProduct) -> DaisoProductOut:
         out = DaisoProductOut.model_validate(d)
-        out.url = f"https://www.daiso.co.kr/search?search={quote(d.name)}"
+        out.url = d.url or f"https://www.daiso.co.kr/search?search={quote(d.name)}"
         return out
 
     return {
