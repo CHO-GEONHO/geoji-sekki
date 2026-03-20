@@ -58,7 +58,7 @@ async def get_daiso_products(
         keyword = re.sub(r"\([^)]*\)", "", name)       # (2개입), (대) 등 제거
         keyword = re.sub(r"\s*(대|중|소|특대|미니)\s*$", "", keyword)  # 사이즈 suffix
         keyword = re.sub(r"\s+", " ", keyword).strip()
-        return f"https://www.daisomall.co.kr/search?q={quote(keyword)}"
+        return f"https://www.daisomall.co.kr/ds?searchQuery={quote(keyword)}"
 
     def _daiso_out(d: DaisoProduct) -> DaisoProductOut:
         out = DaisoProductOut.model_validate(d)
