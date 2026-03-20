@@ -12,9 +12,11 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Optional
+from urllib.parse import quote
 
 from sqlalchemy import select, desc, func, exists
 
@@ -27,6 +29,13 @@ from backend.crawlers.daiso_crawler import _get_month_key
 logger = logging.getLogger("geojisekki.feed")
 
 PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "daily_feed.txt"
+
+
+def _daiso_search_url(name: str) -> str:
+    keyword = re.sub(r"\([^)]*\)", "", name)
+    keyword = re.sub(r"\s*(대|중|소|특대|미니)\s*$", "", keyword)
+    keyword = re.sub(r"\s+", " ", keyword).strip()
+    return f"https://www.daisomall.co.kr/search?q={quote(keyword)}"
 
 
 async def generate_daily_feed(target_date: Optional[date] = None) -> dict:
@@ -236,7 +245,7 @@ async def _collect_active_data(today: date) -> dict:
                     "category": d.category, "ai_score": d.ai_score,
                     "ai_comment": d.ai_comment,
                     "image_url": d.image_url,
-                    "url": d.url or f"https://www.daiso.co.kr/search?search={d.name}",
+                    "url": _daiso_search_url(d.name),
                 }
                 for d in daiso_items
             ]

@@ -50,11 +50,19 @@ async def get_daiso_products(
     result = await db.execute(query)
     items = result.scalars().all()
 
+    import re
     from urllib.parse import quote
+
+    def _daiso_search_url(name: str) -> str:
+        # 괄호/수량/사이즈 제거 후 핵심 키워드만 검색
+        keyword = re.sub(r"\([^)]*\)", "", name)       # (2개입), (대) 등 제거
+        keyword = re.sub(r"\s*(대|중|소|특대|미니)\s*$", "", keyword)  # 사이즈 suffix
+        keyword = re.sub(r"\s+", " ", keyword).strip()
+        return f"https://www.daisomall.co.kr/search?q={quote(keyword)}"
 
     def _daiso_out(d: DaisoProduct) -> DaisoProductOut:
         out = DaisoProductOut.model_validate(d)
-        out.url = d.url or f"https://www.daiso.co.kr/search?search={quote(d.name)}"
+        out.url = _daiso_search_url(d.name)
         return out
 
     return {
