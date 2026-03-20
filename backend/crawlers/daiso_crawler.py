@@ -86,17 +86,23 @@ def _parse_slide(slide: BeautifulSoup, season_url: str) -> list[dict]:
             continue
         price_text = segments[-1]
         price = int(re.sub(r"[^\d]", "", price_text) or 0)
+        product_id = segments[-2].strip()
         name = "_".join(segments[:-2]).strip()
         # 이름이 한글/영문으로 시작 (숫자 시작 = 같은 상품 다른 사이즈 variant → 스킵)
         if not name or not re.match(r"^[가-힣a-zA-Z]", name):
             continue
         if price <= 0 or price > 10000:
             continue
+        # 상품 ID가 숫자면 다이소몰 직접 링크, 아니면 시즌 페이지 fallback
+        if product_id.isdigit():
+            product_url = f"https://www.daisomall.co.kr/pd/pdr/SCR_PDR_0001?pdNo={product_id}"
+        else:
+            product_url = season_url
         products.append({
             "name": name,
             "price": price,
             "image_url": image_url or None,
-            "url": season_url,
+            "url": product_url,
         })
 
     return products
