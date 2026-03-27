@@ -114,7 +114,9 @@ class LLMService:
         provider_name: str,
     ) -> dict:
         kwargs = {}
-        if json_mode:
+        # Gemini는 response_format json_object 미지원 → 파라미터 제외
+        # (프롬프트에 이미 "JSON만 응답" 명시되어 있으므로 _parse_json으로 처리)
+        if json_mode and "gemini" not in provider_name:
             kwargs["response_format"] = {"type": "json_object"}
 
         t0 = time.monotonic()
