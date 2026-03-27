@@ -3,6 +3,7 @@
 fmkorea.com robots.txt 확인일: 2026-03-18
 크롤링 범위: 핫딜 게시판 1~2페이지 (베스트 우선), 일 2회
 요청 간 2~5초 랜덤 딜레이 적용
+curl_cffi Chrome TLS 핑거프린트로 HTTP 430 봇차단 우회
 """
 
 from __future__ import annotations
@@ -88,6 +89,18 @@ class FmkoreaCrawler(BaseCrawler):
         return self._client
 
     async def crawl(self) -> list[dict]:
+        # curl_cffi TLS 핑거프린트 우회 우선 시도
+        try:
+            items = await self._crawl_curl_cffi()
+            if items:
+                items = [i for i in items if i["vote_count"] > 0 or i["comment_count"] > 2]
+                return await self._classify_items(items)
+        except ImportError:
+            logger.warning("[fmkorea] curl_cffi 미설치 — httpx fallback")
+        except Exception as e:
+            logger.warning("[fmkorea] curl_cffi 실패: %s — httpx fallback", e)
+
+        # Fallback: httpx (봇차단 가능성 있음)
         items = []
         for page in range(1, self.max_pages + 1):
             url = f"{HOTDEAL_URL}?page={page}"
@@ -101,10 +114,32 @@ class FmkoreaCrawler(BaseCrawler):
             except Exception as e:
                 logger.error("[fmkorea] page %d 크롤링 실패: %s", page, e)
 
-        # 추천수 0이면서 댓글도 없는 스팸성 제거
         items = [i for i in items if i["vote_count"] > 0 or i["comment_count"] > 2]
+        return await self._classify_items(items)
 
-        items = await self._classify_items(items)
+    async def _crawl_curl_cffi(self) -> list[dict]:
+        """curl_cffi Chrome TLS 핑거프린트로 봇차단 우회."""
+        from curl_cffi import requests as cf_requests
+
+        items = []
+        for page in range(1, self.max_pages + 1):
+            url = f"{HOTDEAL_URL}?page={page}"
+            response = cf_requests.get(
+                url,
+                impersonate="chrome120",
+                headers={
+                    "Accept-Language": "ko-KR,ko;q=0.9",
+                    "Referer": "https://www.fmkorea.com/",
+                },
+                timeout=30,
+            )
+            response.raise_for_status()
+            page_items = self._parse_page(response.text)
+            items.extend(page_items)
+            logger.info("[fmkorea] curl_cffi page %d: %d개 수집", page, len(page_items))
+            if page < self.max_pages:
+                await self.delay()
+
         return items
 
     def _parse_page(self, html: str) -> list[dict]:
