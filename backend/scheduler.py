@@ -7,7 +7,6 @@ FastAPI lifespan에서 start_scheduler()로 시작.
   편의점:     매일 06:00
   뽐뿌:      매일 08:00, 18:00
   루리웹:    매일 09:00, 19:00
-  에펨코리아: 매일 10:00, 20:00
   올영:      매일 07:00
   다이소:    주 1회 (월) 07:00
   피드 생성:  매일 07:00~23:00 (2시간마다)
@@ -58,16 +57,6 @@ async def run_ruliweb():
     except Exception as e:
         await notify_crawl_result("ruliweb", "failed", 0, 0, str(e))
 
-
-async def run_fmkorea():
-    from backend.crawlers.fmkorea_crawler import FmkoreaCrawler
-    from backend.services.telegram_service import notify_crawl_result
-    crawler = FmkoreaCrawler()
-    try:
-        count = await crawler.run()
-        await notify_crawl_result("fmkorea", "success", count, 0)
-    except Exception as e:
-        await notify_crawl_result("fmkorea", "failed", 0, 0, str(e))
 
 
 async def run_oliveyoung():
@@ -146,21 +135,7 @@ def start_scheduler():
         replace_existing=True,
     )
 
-    # 에펨코리아: 매일 10:00, 20:00 KST
-    scheduler.add_job(
-        run_fmkorea,
-        CronTrigger(hour=10, minute=0),
-        id="fmkorea_morning",
-        replace_existing=True,
-    )
-    scheduler.add_job(
-        run_fmkorea,
-        CronTrigger(hour=20, minute=0),
-        id="fmkorea_evening",
-        replace_existing=True,
-    )
-
-    # 올영: 매일 07:00 KST (베스트 3페이지 ~300개)
+# 올영: 매일 07:00 KST (베스트 3페이지 ~300개)
     scheduler.add_job(
         run_oliveyoung,
         CronTrigger(hour=7, minute=0),

@@ -1,7 +1,7 @@
 """AI 데일리 피드 생성 서비스.
 
 매일 07:30 KST 실행:
-1. 오늘 기준 활성 데이터 수집 (편의점/뽐뿌/올영/다이소)
+1. 오늘 기준 활성 데이터 수집 (편의점/뽐뿌/루리웹/올영/다이소)
 2. DeepSeek에 전달 → 5~7개 피드 카드 선정
 3. 거지세끼 톤 카피 생성
 4. feeds 테이블 저장
@@ -181,10 +181,10 @@ async def _collect_active_data(today: date) -> dict:
                 for p in cvs_items
             ]
 
-        # 핫딜 (뽐뿌 + 에펨코리아 + 루리웹): 최근 48시간, 소스별 추천수 상위 15개씩
+        # 핫딜 (뽐뿌 + 루리웹): 최근 48시간, 소스별 추천수 상위 15개씩
         two_days_ago = datetime.combine(today - timedelta(days=2), datetime.min.time())
         hotdeal_items = []
-        for source in ("ppomppu", "fmkorea", "ruliweb"):
+        for source in ("ppomppu", "ruliweb"):
             result = await session.execute(
                 select(Hotdeal)
                 .where(Hotdeal.source == source)

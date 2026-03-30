@@ -92,7 +92,7 @@ async def health_check(request: Request):
 
     crawlers = {}
     async with async_session() as session:
-        for crawler_name in ["pyony", "ppomppu", "fmkorea", "oliveyoung", "daiso"]:
+        for crawler_name in ["pyony", "ppomppu", "ruliweb", "oliveyoung", "daiso"]:
             result = await session.execute(
                 select(CrawlLog)
                 .where(CrawlLog.crawler_name == crawler_name, CrawlLog.status == "success")
