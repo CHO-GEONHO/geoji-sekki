@@ -6,6 +6,7 @@ FastAPI lifespan에서 start_scheduler()로 시작.
 스케줄:
   편의점:     매일 06:00
   뽐뿌:      매일 08:00, 18:00
+  루리웹:    매일 09:00, 19:00
   에펨코리아: 매일 10:00, 20:00
   올영:      매일 07:00
   다이소:    주 1회 (월) 07:00
@@ -45,6 +46,17 @@ async def run_ppomppu():
         await notify_crawl_result("ppomppu", "success", count, 0)
     except Exception as e:
         await notify_crawl_result("ppomppu", "failed", 0, 0, str(e))
+
+
+async def run_ruliweb():
+    from backend.crawlers.ruliweb_crawler import RuliwebCrawler
+    from backend.services.telegram_service import notify_crawl_result
+    crawler = RuliwebCrawler()
+    try:
+        count = await crawler.run()
+        await notify_crawl_result("ruliweb", "success", count, 0)
+    except Exception as e:
+        await notify_crawl_result("ruliweb", "failed", 0, 0, str(e))
 
 
 async def run_fmkorea():
@@ -117,6 +129,20 @@ def start_scheduler():
         run_ppomppu,
         CronTrigger(hour=18, minute=0),
         id="ppomppu_evening",
+        replace_existing=True,
+    )
+
+    # 루리웹: 매일 09:00, 19:00 KST
+    scheduler.add_job(
+        run_ruliweb,
+        CronTrigger(hour=9, minute=0),
+        id="ruliweb_morning",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_ruliweb,
+        CronTrigger(hour=19, minute=0),
+        id="ruliweb_evening",
         replace_existing=True,
     )
 

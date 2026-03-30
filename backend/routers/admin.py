@@ -17,7 +17,7 @@ router = APIRouter(prefix="/admin", tags=["관리"])
 async def trigger_crawl(crawler_name: str, request: Request):
     """크롤러 수동 실행 트리거
 
-    사용 가능: pyony, ppomppu, fmkorea, oliveyoung, daiso, all
+    사용 가능: pyony, ppomppu, fmkorea, ruliweb, oliveyoung, daiso, all
     """
     crawlers = {}
 
@@ -41,9 +41,13 @@ async def trigger_crawl(crawler_name: str, request: Request):
         from backend.crawlers.fmkorea_crawler import FmkoreaCrawler
         crawlers["fmkorea"] = FmkoreaCrawler()
 
+    if crawler_name in ("ruliweb", "all"):
+        from backend.crawlers.ruliweb_crawler import RuliwebCrawler
+        crawlers["ruliweb"] = RuliwebCrawler()
+
     if not crawlers:
         return {"error": f"알 수 없는 크롤러: {crawler_name}",
-                "available": ["pyony", "ppomppu", "fmkorea", "oliveyoung", "daiso", "all"]}
+                "available": ["pyony", "ppomppu", "fmkorea", "ruliweb", "oliveyoung", "daiso", "all"]}
 
     results = {}
     for name, crawler in crawlers.items():

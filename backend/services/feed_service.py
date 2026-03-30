@@ -181,16 +181,16 @@ async def _collect_active_data(today: date) -> dict:
                 for p in cvs_items
             ]
 
-        # 핫딜 (뽐뿌 + 에펨코리아): 최근 48시간, 소스별 추천수 상위 8개씩
+        # 핫딜 (뽐뿌 + 에펨코리아 + 루리웹): 최근 48시간, 소스별 추천수 상위 15개씩
         two_days_ago = datetime.combine(today - timedelta(days=2), datetime.min.time())
         hotdeal_items = []
-        for source in ("ppomppu", "fmkorea"):
+        for source in ("ppomppu", "fmkorea", "ruliweb"):
             result = await session.execute(
                 select(Hotdeal)
                 .where(Hotdeal.source == source)
                 .where(Hotdeal.crawled_at >= two_days_ago)
                 .order_by(desc(Hotdeal.vote_count))
-                .limit(8)
+                .limit(15)
             )
             hotdeal_items.extend(result.scalars().all())
 
