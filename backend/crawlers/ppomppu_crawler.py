@@ -29,6 +29,7 @@ logger = logging.getLogger("geojisekki.crawler.ppomppu")
 
 BASE_URL = "https://www.ppomppu.co.kr"
 HOTDEAL_URL = f"{BASE_URL}/zboard/zboard.php?id=ppomppu"
+OVERSEAS_URL = f"{BASE_URL}/zboard/zboard.php?id=overseas"
 
 # 키워드 기반 카테고리 분류 (LLM 호출 최소화)
 CATEGORY_KEYWORDS = {
@@ -75,7 +76,7 @@ def _parse_price(text: str) -> Optional[int]:
 class PpomppuCrawler(BaseCrawler):
     name = "ppomppu"
     min_expected_items = 5
-    max_pages = 2  # 1~2페이지만
+    max_pages = 4  # 국내 1~4페이지
 
     async def get_client(self) -> httpx.AsyncClient:
         """뽐뿌 전용 클라이언트 — Referer/Accept 헤더 추가로 403 방지"""
