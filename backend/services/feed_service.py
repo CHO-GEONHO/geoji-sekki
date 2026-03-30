@@ -1,7 +1,7 @@
 """AI 데일리 피드 생성 서비스.
 
 매일 07:30 KST 실행:
-1. 오늘 기준 활성 데이터 수집 (편의점/뽐뿌/루리웹/올영/다이소)
+1. 오늘 기준 활성 데이터 수집 (편의점/뽐뿌/루리웹/올영/다이소/쿠팡)
 2. DeepSeek에 전달 → 5~7개 피드 카드 선정
 3. 거지세끼 톤 카피 생성
 4. feeds 테이블 저장
@@ -21,7 +21,7 @@ from urllib.parse import quote
 from sqlalchemy import select, desc, func, exists
 
 from backend.database import async_session
-from backend.models import CvsProduct, Hotdeal, OliveyoungDeal, DaisoProduct, Feed
+from backend.models import CvsProduct, Hotdeal, OliveyoungDeal, DaisoProduct, CoupangDeal, Feed
 from backend.services.llm_service import llm_service
 from backend.crawlers.pyony_crawler import _get_week_key
 from backend.crawlers.daiso_crawler import _get_month_key
@@ -248,6 +248,25 @@ async def _collect_active_data(today: date) -> dict:
                     "url": _daiso_search_url(d.name),
                 }
                 for d in daiso_items
+            ]
+
+        # 쿠팡: 할인율 상위 5개
+        coupang_result = await session.execute(
+            select(CoupangDeal)
+            .where(CoupangDeal.discount_rate.isnot(None))
+            .order_by(desc(CoupangDeal.discount_rate))
+            .limit(5)
+        )
+        coupang_items = coupang_result.scalars().all()
+        if coupang_items:
+            data["coupang"] = [
+                {
+                    "name": c.name, "original_price": c.original_price,
+                    "sale_price": c.sale_price, "discount_rate": c.discount_rate,
+                    "category": c.category, "image_url": c.image_url,
+                    "url": c.url, "is_rocket": c.is_rocket,
+                }
+                for c in coupang_items
             ]
 
     return data

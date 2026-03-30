@@ -8,6 +8,7 @@ const TodayFeed = lazy(() => import('./pages/TodayFeed'))
 const CvsPage = lazy(() => import('./pages/CvsPage'))
 const OliveyoungPage = lazy(() => import('./pages/OliveyoungPage'))
 const DaisoPage = lazy(() => import('./pages/DaisoPage'))
+const CoupangPage = lazy(() => import('./pages/CoupangPage'))
 const HotdealsPage = lazy(() => import('./pages/HotdealsPage'))
 
 export default function App() {
@@ -43,6 +44,7 @@ export default function App() {
             <Route path="/cvs" element={<CvsPage />} />
             <Route path="/oliveyoung" element={<OliveyoungPage />} />
             <Route path="/daiso" element={<DaisoPage />} />
+            <Route path="/coupang" element={<CoupangPage />} />
             <Route path="/hotdeals" element={<HotdealsPage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

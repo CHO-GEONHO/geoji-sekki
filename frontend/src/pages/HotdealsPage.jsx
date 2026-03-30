@@ -8,17 +8,45 @@ import EmptyState from '../components/EmptyState'
 import ShareButton from '../components/ShareButton'
 
 const CATEGORIES = ['전자제품', '식품', '패션', '뷰티', '생활용품', '여행', '도서/문화']
+const SOURCES = [
+  { value: 'ppomppu', label: '뽐뿌' },
+  { value: 'ruliweb', label: '루리웹' },
+]
+
+const SOURCE_BADGE = {
+  ppomppu: { class: 'bg-blue-100 text-blue-700', label: '뽐뿌' },
+  ruliweb: { class: 'bg-violet-100 text-violet-700', label: '루리웹' },
+}
 
 export default function HotdealsPage() {
-  const { hotdealSort, hotdealCategory, setHotdealSort, setHotdealCategory } = useAppStore()
+  const { hotdealSort, hotdealCategory, hotdealSource, setHotdealSort, setHotdealCategory, setHotdealSource } = useAppStore()
   const [page, setPage] = useState(1)
 
   const { data, isLoading } = useHotdeals({
-    sort: hotdealSort, category: hotdealCategory, page,
+    sort: hotdealSort, category: hotdealCategory, source: hotdealSource, page,
   })
 
   return (
     <div>
+      {/* 소스 필터 */}
+      <div className="flex gap-2 mb-2 overflow-x-auto">
+        <button
+          onClick={() => { setHotdealSource(null); setPage(1) }}
+          className={`filter-chip whitespace-nowrap ${!hotdealSource ? 'filter-chip-active' : 'filter-chip-inactive'}`}
+        >
+          전체
+        </button>
+        {SOURCES.map(s => (
+          <button
+            key={s.value}
+            onClick={() => { setHotdealSource(hotdealSource === s.value ? null : s.value); setPage(1) }}
+            className={`filter-chip whitespace-nowrap ${hotdealSource === s.value ? 'filter-chip-active' : 'filter-chip-inactive'}`}
+          >
+            {s.label}
+          </button>
+        ))}
+      </div>
+
       {/* 정렬 */}
       <div className="flex gap-2 mb-3">
         <button
@@ -111,6 +139,11 @@ function HotdealCard({ deal }) {
             {deal.price_value && (
               <span className="font-bold text-geoji-600">
                 {deal.price_value.toLocaleString()}원
+              </span>
+            )}
+            {deal.source && SOURCE_BADGE[deal.source] && (
+              <span className={`badge ${SOURCE_BADGE[deal.source].class}`}>
+                {SOURCE_BADGE[deal.source].label}
               </span>
             )}
             {deal.category && (

@@ -8,6 +8,7 @@ FastAPI lifespan에서 start_scheduler()로 시작.
   뽐뿌:      매일 08:00, 18:00
   루리웹:    매일 09:00, 19:00
   올영:      매일 07:00
+  쿠팡:      매일 08:00, 14:00
   다이소:    주 1회 (월) 07:00
   피드 생성:  매일 07:00~23:00 (2시간마다)
   일일 리포트: 매일 20:00
@@ -81,6 +82,17 @@ async def run_daiso():
         await notify_crawl_result("daiso", "failed", 0, 0, str(e))
 
 
+async def run_coupang():
+    from backend.crawlers.coupang_crawler import CoupangCrawler
+    from backend.services.telegram_service import notify_crawl_result
+    crawler = CoupangCrawler()
+    try:
+        count = await crawler.run()
+        await notify_crawl_result("coupang", "success", count, 0)
+    except Exception as e:
+        await notify_crawl_result("coupang", "failed", 0, 0, str(e))
+
+
 async def run_feed_generation():
     from backend.services.feed_service import generate_daily_feed
     from backend.services.telegram_service import notify_feed_generated
@@ -140,6 +152,20 @@ def start_scheduler():
         run_oliveyoung,
         CronTrigger(hour=7, minute=0),
         id="oliveyoung",
+        replace_existing=True,
+    )
+
+    # 쿠팡: 매일 08:00, 14:00 KST (골드박스 오전 7시 갱신)
+    scheduler.add_job(
+        run_coupang,
+        CronTrigger(hour=8, minute=0),
+        id="coupang_morning",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        run_coupang,
+        CronTrigger(hour=14, minute=0),
+        id="coupang_afternoon",
         replace_existing=True,
     )
 

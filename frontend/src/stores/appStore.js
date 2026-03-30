@@ -26,6 +26,14 @@ export const useAppStore = create((set) => ({
   // 핫딜 필터
   hotdealSort: 'votes',
   hotdealCategory: null,
+  hotdealSource: null,
   setHotdealSort: (sort) => set({ hotdealSort: sort }),
   setHotdealCategory: (cat) => set({ hotdealCategory: cat }),
+  setHotdealSource: (src) => set({ hotdealSource: src }),
+
+  // 쿠팡 필터
+  coupangCategory: null,
+  coupangSort: 'discount',
+  setCoupangCategory: (cat) => set({ coupangCategory: cat }),
+  setCoupangSort: (sort) => set({ coupangSort: sort }),
 }))

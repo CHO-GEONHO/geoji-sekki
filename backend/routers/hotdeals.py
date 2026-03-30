@@ -27,13 +27,16 @@ async def get_hotdeals(
     request: Request,
     sort: SortEnum = SortEnum.votes,
     category: Optional[str] = None,
+    source: Optional[str] = None,
     limit: int = Query(20, ge=1, le=100),
     page: int = Query(1, ge=1),
     db: AsyncSession = Depends(get_db),
 ):
-    """핫딜 목록 (추천순/최신순)"""
+    """핫딜 목록 (추천순/최신순, 소스 필터 가능)"""
     query = select(Hotdeal)
 
+    if source:
+        query = query.where(Hotdeal.source == source)
     if category:
         query = query.where(Hotdeal.category == category)
 

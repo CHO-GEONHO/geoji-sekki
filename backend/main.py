@@ -72,11 +72,12 @@ app.add_middleware(
 )
 
 # ── Routers ──
-from backend.routers import feed, cvs, oliveyoung, daiso, hotdeals, admin
+from backend.routers import feed, cvs, oliveyoung, daiso, coupang, hotdeals, admin
 app.include_router(feed.router, prefix="/api")
 app.include_router(cvs.router, prefix="/api")
 app.include_router(oliveyoung.router, prefix="/api")
 app.include_router(daiso.router, prefix="/api")
+app.include_router(coupang.router, prefix="/api")
 app.include_router(hotdeals.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 
@@ -92,7 +93,7 @@ async def health_check(request: Request):
 
     crawlers = {}
     async with async_session() as session:
-        for crawler_name in ["pyony", "ppomppu", "ruliweb", "oliveyoung", "daiso"]:
+        for crawler_name in ["pyony", "ppomppu", "ruliweb", "oliveyoung", "daiso", "coupang"]:
             result = await session.execute(
                 select(CrawlLog)
                 .where(CrawlLog.crawler_name == crawler_name, CrawlLog.status == "success")

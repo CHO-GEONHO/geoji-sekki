@@ -123,7 +123,31 @@ class DaisoProduct(Base):
 
 
 # ─────────────────────────────────────────────
-# 5. AI 피드
+# 5. 쿠팡 골드박스
+# ─────────────────────────────────────────────
+class CoupangDeal(Base):
+    __tablename__ = "coupang_deals"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(500), nullable=False)
+    original_price = Column(Integer)
+    sale_price = Column(Integer)
+    discount_rate = Column(Integer)                  # %
+    category = Column(String(50))
+    url = Column(Text, nullable=False)
+    image_url = Column(Text)
+    is_rocket = Column(Boolean, default=False)       # 로켓배송 여부
+    crawled_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("url", name="uq_coupang_url"),
+        Index("idx_coupang_discount", "discount_rate"),
+        Index("idx_coupang_category", "category"),
+    )
+
+
+# ─────────────────────────────────────────────
+# 6. AI 피드
 # ─────────────────────────────────────────────
 class Feed(Base):
     __tablename__ = "feeds"
@@ -138,7 +162,7 @@ class Feed(Base):
 
 
 # ─────────────────────────────────────────────
-# 6. 크롤링 로그
+# 7. 크롤링 로그
 # ─────────────────────────────────────────────
 class CrawlLog(Base):
     __tablename__ = "crawl_logs"
@@ -154,7 +178,7 @@ class CrawlLog(Base):
 
 
 # ─────────────────────────────────────────────
-# 7. 클릭 추적 (수익화 기반)
+# 8. 클릭 추적 (수익화 기반)
 # ─────────────────────────────────────────────
 class ClickLog(Base):
     __tablename__ = "click_logs"

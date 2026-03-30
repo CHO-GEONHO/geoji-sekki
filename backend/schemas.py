@@ -99,6 +99,21 @@ class DaisoProductOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+# ── 쿠팡 ──
+class CoupangDealOut(BaseModel):
+    id: int
+    name: str
+    original_price: Optional[int] = None
+    sale_price: Optional[int] = None
+    discount_rate: Optional[int] = None
+    category: Optional[str] = None
+    url: Optional[str] = None
+    image_url: Optional[str] = None
+    is_rocket: bool = False
+
+    model_config = {"from_attributes": True}
+
+
 # ── 피드 ──
 class FeedItem(BaseModel):
     title: str

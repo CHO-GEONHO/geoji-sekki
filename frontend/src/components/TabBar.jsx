@@ -1,11 +1,12 @@
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Home, Store, Sparkles, ShoppingBag, Flame } from 'lucide-react'
+import { Home, Store, Sparkles, ShoppingBag, ShoppingCart, Flame } from 'lucide-react'
 
 const tabs = [
   { path: '/', label: '오늘', icon: Home },
   { path: '/cvs', label: '편의점', icon: Store },
   { path: '/oliveyoung', label: '올영', icon: Sparkles },
   { path: '/daiso', label: '다이소', icon: ShoppingBag },
+  { path: '/coupang', label: '쿠팡', icon: ShoppingCart },
   { path: '/hotdeals', label: '핫딜', icon: Flame },
 ]
 

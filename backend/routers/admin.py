@@ -17,7 +17,7 @@ router = APIRouter(prefix="/admin", tags=["관리"])
 async def trigger_crawl(crawler_name: str, request: Request):
     """크롤러 수동 실행 트리거
 
-    사용 가능: pyony, ppomppu, ruliweb, oliveyoung, daiso, all
+    사용 가능: pyony, ppomppu, ruliweb, oliveyoung, daiso, coupang, all
     """
     crawlers = {}
 
@@ -41,9 +41,13 @@ async def trigger_crawl(crawler_name: str, request: Request):
         from backend.crawlers.ruliweb_crawler import RuliwebCrawler
         crawlers["ruliweb"] = RuliwebCrawler()
 
+    if crawler_name in ("coupang", "all"):
+        from backend.crawlers.coupang_crawler import CoupangCrawler
+        crawlers["coupang"] = CoupangCrawler()
+
     if not crawlers:
         return {"error": f"알 수 없는 크롤러: {crawler_name}",
-                "available": ["pyony", "ppomppu", "ruliweb", "oliveyoung", "daiso", "all"]}
+                "available": ["pyony", "ppomppu", "ruliweb", "oliveyoung", "daiso", "coupang", "all"]}
 
     results = {}
     for name, crawler in crawlers.items():
@@ -82,7 +86,7 @@ async def get_status(request: Request):
     """전체 시스템 상태"""
     from sqlalchemy import select, func, desc
     from backend.database import async_session
-    from backend.models import CvsProduct, Hotdeal, OliveyoungDeal, DaisoProduct, Feed, CrawlLog
+    from backend.models import CvsProduct, Hotdeal, OliveyoungDeal, DaisoProduct, CoupangDeal, Feed, CrawlLog
 
     async with async_session() as session:
         counts = {}
@@ -91,6 +95,7 @@ async def get_status(request: Request):
             ("hotdeals", Hotdeal),
             ("oliveyoung_deals", OliveyoungDeal),
             ("daiso_products", DaisoProduct),
+            ("coupang_deals", CoupangDeal),
             ("feeds", Feed),
         ]:
             result = await session.execute(select(func.count()).select_from(model))

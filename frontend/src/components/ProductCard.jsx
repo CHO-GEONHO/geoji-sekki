@@ -83,6 +83,27 @@ export default function ProductCard({ product, type = 'cvs' }) {
                   ★ {product.ai_score.toFixed(1)}
                 </span>
               )}
+              {product.is_new && (
+                <span className="text-[10px] font-bold text-red-500 bg-red-50 px-1.5 py-0.5 rounded-full">NEW</span>
+              )}
+            </>
+          )}
+
+          {type === 'coupang' && (
+            <>
+              <span className="text-base font-bold text-geoji-600">
+                {product.sale_price?.toLocaleString()}원
+              </span>
+              {product.original_price && (
+                <span className="text-xs text-gray-400 line-through">
+                  {product.original_price?.toLocaleString()}원
+                </span>
+              )}
+              {product.discount_rate && (
+                <span className="text-xs font-bold text-red-500">
+                  -{product.discount_rate}%
+                </span>
+              )}
             </>
           )}
         </div>
@@ -93,6 +114,9 @@ export default function ProductCard({ product, type = 'cvs' }) {
           {product.store && <StoreTag store={product.store} />}
           {product.brand && (
             <span className="text-xs text-gray-400">{product.brand}</span>
+          )}
+          {product.is_rocket && (
+            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full">🚀 로켓</span>
           )}
         </div>
 

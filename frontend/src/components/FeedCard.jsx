@@ -5,6 +5,7 @@ const SOURCE_CONFIG = {
   hotdeal:    { label: '핫딜',   color: 'bg-red-500',    text: 'text-white',      accent: 'border-red-200 bg-red-50' },
   oliveyoung: { label: '올영',   color: 'bg-violet-500', text: 'text-white',      accent: 'border-violet-200 bg-violet-50' },
   daiso:      { label: '다이소', color: 'bg-yellow-400', text: 'text-gray-900',   accent: 'border-yellow-200 bg-yellow-50' },
+  coupang:    { label: '쿠팡',   color: 'bg-rose-500',   text: 'text-white',      accent: 'border-rose-200 bg-rose-50' },
 }
 
 const STORE_LABELS = {
@@ -43,7 +44,7 @@ export default function FeedCard({ item }) {
           </h3>
 
           {/* 본문 */}
-          <p className="text-[13px] text-gray-400 leading-relaxed whitespace-pre-line">
+          <p className="text-[13px] text-gray-600 leading-relaxed whitespace-pre-line">
             {body}
           </p>
 

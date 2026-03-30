@@ -80,11 +80,21 @@ export function useDaisoNew(page = 1) {
 }
 
 // ── 핫딜 ──
-export function useHotdeals({ sort = 'votes', category, page = 1, limit = 20 } = {}) {
+export function useHotdeals({ sort = 'votes', category, source, page = 1, limit = 20 } = {}) {
   return useQuery({
-    queryKey: ['hotdeals', sort, category, page],
+    queryKey: ['hotdeals', sort, category, source, page],
     queryFn: () => api.get('/hotdeals', {
-      params: { sort, category, page, limit },
+      params: { sort, category, source, page, limit },
+    }).then(r => r.data),
+  })
+}
+
+// ── 쿠팡 ──
+export function useCoupang({ category, sort = 'discount', page = 1 } = {}) {
+  return useQuery({
+    queryKey: ['coupang', category, sort, page],
+    queryFn: () => api.get('/coupang', {
+      params: { category, sort, page, page_size: 50 },
     }).then(r => r.data),
   })
 }
