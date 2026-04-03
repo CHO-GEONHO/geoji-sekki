@@ -115,9 +115,13 @@ class LLMService:
     ) -> dict:
         kwargs = {}
         # Gemini는 response_format json_object 미지원 → 파라미터 제외
-        # (프롬프트에 이미 "JSON만 응답" 명시되어 있으므로 _parse_json으로 처리)
         if json_mode and "gemini" not in provider_name:
             kwargs["response_format"] = {"type": "json_object"}
+
+        # Gemini 2.5 Pro는 thinking 토큰이 max_tokens에 포함됨
+        # → 실제 출력 공간 확보를 위해 max_tokens를 크게 설정
+        if "gemini" in provider_name:
+            max_tokens = max(max_tokens, 16000)
 
         t0 = time.monotonic()
         # Gemini 빈 응답 대비 최대 2회 시도
