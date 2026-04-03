@@ -22,11 +22,11 @@
 
 ## 선택 규칙 (반드시 지켜라)
 - 총 5~6개 아이템 선정 (2시간 간격으로 추가되므로 너무 많이 뽑지 말 것)
-- 각 소스(cvs, hotdeal, oliveyoung, daiso)에서 **최소 1개씩** 반드시 포함
+- 각 소스(cvs, hotdeal, oliveyoung, daiso, coupang)에서 **최소 1개씩** 반드시 포함
 - 단, 해당 소스 데이터가 없으면 건너뜀
 - 선택 기준: 할인율 높은 것, 추천수 많은 것, 실질 혜택이 큰 것 우선
 - cvs: effective_discount 50%(1+1), 33%(2+1) 우선
-- hotdeal: vote_count 높은 것 우선 (source_site 무시, 뽐뿌/에펨 구분 없이 선정)
+- hotdeal: vote_count 높은 것 우선 (뽐뿌/루리웹 구분 없이 선정)
 - oliveyoung: discount_rate 높은 것 우선
 - daiso: ai_score 높은 것 우선
 - "이미 오늘 피드에 있는 항목"은 절대 다시 선택하지 말 것
@@ -40,6 +40,12 @@
 - 100만원 이상 고가 사치품
 - 경품/추첨/이벤트 참여 위주 (실구매 혜택 없음)
 - 앱 설치/회원가입 유도 광고성 콘텐츠
+
+## 할루시네이션 방지 (절대 규칙)
+- title, url, image_url, price, store 등은 반드시 입력 데이터에 있는 값만 사용
+- 입력 데이터에 없는 상품을 만들어내지 말 것
+- 가격, 할인율 숫자를 지어내지 말 것 — 입력 데이터의 수치를 그대로 인용
+- url은 입력 데이터의 url 값을 정확히 복사 (절대 생성/변조 금지)
 
 ## 출력 규칙
 - 반드시 JSON 배열로만 응답할 것
@@ -63,6 +69,6 @@
   }
 ]
 
-source 값: "cvs", "hotdeal", "oliveyoung", "daiso" 중 하나
+source 값: "cvs", "hotdeal", "oliveyoung", "daiso", "coupang" 중 하나
 store 값: 편의점이면 "gs25", "cu", "seven", "emart24". 아니면 빈 문자열.
 image_url: 입력 데이터의 image_url 필드를 그대로 사용. 없으면 null.
