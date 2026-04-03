@@ -103,6 +103,24 @@ async def generate_daily_feed(target_date: Optional[date] = None) -> dict:
         # 기존 항목과 중복 제목 필터링
         new_items = [i for i in new_items if i.get("title", "") not in existing_titles]
 
+        # 첫 생성에서 최소 3개 미만이면 중복 체크 완화 후 재시도
+        MIN_FEED_ITEMS = 3
+        if not existing_items and len(new_items) < MIN_FEED_ITEMS:
+            logger.warning("[feed] 첫 생성 %d개 미달 — 중복 체크 없이 재시도", len(new_items))
+            try:
+                retry_result = await llm_service.chat_feed(
+                    system_prompt, user_prompt, max_tokens=4000
+                )
+                retry_items = retry_result["data"]
+                if isinstance(retry_items, dict):
+                    retry_items = retry_items.get("items", retry_items.get("feed", []))
+                if len(retry_items) >= MIN_FEED_ITEMS:
+                    new_items = retry_items
+                    result = retry_result
+                    logger.info("[feed] 재시도 성공: %d개", len(new_items))
+            except Exception as e:
+                logger.warning("[feed] 재시도 실패: %s — 기존 결과 사용", e)
+
         # 3. 저장 (기존 피드가 있으면 append, 없으면 신규 생성)
         async with async_session() as session:
             existing_row = await session.execute(

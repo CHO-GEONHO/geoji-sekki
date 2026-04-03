@@ -120,23 +120,33 @@ class LLMService:
             kwargs["response_format"] = {"type": "json_object"}
 
         t0 = time.monotonic()
-        try:
-            response = await client.chat.completions.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt},
-                ],
-                max_tokens=max_tokens,
-                temperature=0.7,
-                **kwargs,
-            )
-        except Exception:
-            await usage_logger.record(provider_name, error=True)
-            raise
+        # Gemini 빈 응답 대비 최대 2회 시도
+        max_attempts = 2 if "gemini" in provider_name else 1
+        content = None
+        response = None
+        for attempt in range(max_attempts):
+            try:
+                response = await client.chat.completions.create(
+                    model=model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    max_tokens=max_tokens,
+                    temperature=0.7,
+                    **kwargs,
+                )
+            except Exception:
+                await usage_logger.record(provider_name, error=True)
+                raise
+
+            content = response.choices[0].message.content
+            if content:
+                break
+            if attempt < max_attempts - 1:
+                logger.warning("[%s] 빈 응답 — 재시도 %d/%d", provider_name, attempt + 2, max_attempts)
 
         latency_ms = (time.monotonic() - t0) * 1000
-        content = response.choices[0].message.content
         usage = response.usage
         input_tokens = usage.prompt_tokens if usage else 0
         output_tokens = usage.completion_tokens if usage else 0
